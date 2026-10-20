@@ -1,0 +1,23 @@
+APORTE BRASIL - INSTALADOR WINDOWS 64 BITS
+
+1. Extraia todo o ZIP para uma pasta.
+2. Abra Instalar.cmd. Nao precisa de Python nem de administrador.
+3. Abra pelo atalho Aporte Brasil e crie sua senha na tela local.
+
+O pacote contem apenas o programa, sem carteiras, bancos, extratos, backups,
+senhas, chaves de API ou capturas do usuario que criou o pacote.
+
+Programa: %LOCALAPPDATA%\Programs\AporteBrasil
+Dados: %LOCALAPPDATA%\AporteBrasil\data\carteira.aporteb
+Desinstalar ou atualizar preserva os dados privados.
+Use "Encerrar aplicativo" antes de reinstalar uma versao em uso.
+
+Para IA neste instalador, use a conexao com Ollama/llama.cpp.
+FinBERT e Chronos continuam na versao por codigo, com os pacotes opcionais
+de IA. Seus pacotes e pesos nao fazem parte deste ZIP.
+Para gerar outras versoes, abra a pasta de codigo do projeto e use
+Preferencias > Gerar instalador. O programa instalado nao recompila o codigo.
+
+Este pacote nao tem assinatura digital de editor. Nao existe recuperacao de
+senha por email. Backups antigos conservam a senha da epoca em que foram
+criados. Guarde sua senha num gerenciador e uma copia do backup protegido.
