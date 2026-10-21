@@ -80,6 +80,10 @@ def replace_process(root, port):
         # Independent of the old command window, which may close after its Python exits.
         env=dict(os.environ)
         if getattr(sys,'frozen',False):env['PYINSTALLER_RESET_ENVIRONMENT']='1'
+        elif (Path(root)/'Iniciar.ps1').is_file():
+            # A UI restart after git pull also prepares changed dependencies.
+            command=['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass',
+                     '-File',str(Path(root)/'Iniciar.ps1'),'-Port',str(port),'-NoBrowser']
         subprocess.Popen(command,env=env,close_fds=True,creationflags=subprocess.CREATE_NO_WINDOW,
                          stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     else:

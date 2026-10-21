@@ -41,8 +41,8 @@ async function restartApplication(button){
   const r=await fetch('/api/security/restart',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':S?.csrf||securityCsrf},body:'{}'}),result=await r.json();
   if(!r.ok)throw Error(result.error||'Não foi possível reiniciar. Use Reiniciar Aporte Brasil.cmd.');
   await securityScreen({initialized:true,legacy_files:0});
-  $('#main').innerHTML='<section class="vault-card panel"><h1>Reiniciando aplicativo…</h1><p>A carteira está fechada. Carregando os arquivos atuais; a senha será solicitada novamente.</p></section>';
-  const deadline=Date.now()+30000;
+  $('#main').innerHTML='<section class="vault-card panel"><h1>Reiniciando aplicativo…</h1><p>A carteira está fechada. Carregando a versão atual e preparando novos componentes, se necessário. Isso pode levar alguns minutos; a senha será solicitada novamente.</p></section>';
+  const deadline=Date.now()+300000;
   while(Date.now()<deadline){
    await new Promise(resolve=>setTimeout(resolve,500));
    try{const response=await fetch('/api/health',{cache:'no-store'});if(response.ok){const health=await response.json();if(health.app==='aporte-brasil'&&health.instance&&health.instance!==result.previous_instance){location.reload();return;}}}catch{}

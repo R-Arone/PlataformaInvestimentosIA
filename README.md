@@ -13,7 +13,7 @@ Aplicação local para organizar investimentos, pesquisar empresas, comparar cen
 
 ## Executar
 
-Requer Python 3.11 ou superior com suporte a `sqlite3.Connection.serialize` e `deserialize`.
+Requer Python 3.11 ou superior com suporte a `sqlite3.Connection.serialize` e `deserialize`. No Windows, instale Python uma vez, clone o repositório e clique em **Abrir Aporte Brasil.cmd**. O ambiente `.venv` e as dependências básicas são preparados automaticamente, sem exigir pacotes de IA. A primeira preparação pode precisar de internet. Também é possível preparar manualmente:
 
 ```powershell
 git clone https://github.com/R-Arone/PlataformaInvestimentosIA.git
@@ -25,7 +25,21 @@ python -m venv .venv
 
 Abra **http://127.0.0.1:8765**. Na primeira execução, crie uma senha local de pelo menos 12 caracteres. A carteira começa vazia; cadastre seus próprios ativos ou importe seus arquivos pela interface.
 
-No Windows, também é possível usar **Abrir Aporte Brasil.cmd** depois de preparar o ambiente. Consultas de mercado precisam de internet; algumas fontes exigem uma chave própria, configurada nas preferências locais.
+Consultas de mercado precisam de internet; algumas fontes exigem uma chave própria, configurada nas preferências locais.
+
+## Receber uma nova versão sem compartilhar carteiras
+
+Na pasta clonada, execute:
+
+```powershell
+git pull --ff-only
+```
+
+Depois clique em **Abrir Aporte Brasil.cmd** ou em **Reiniciar Aporte Brasil.cmd** (opção 1). Ambos encerram a instância anterior de forma normal e carregam o código atualizado. O botão de reinício dentro da interface também passa pelo preparador de ambiente. Se as dependências básicas mudaram, a atualização é feita no ambiente local antes de abrir. Se nada mudou, não há nova instalação de pacotes. Uma tarefa ativa pode impedir o reinício normal; conclua-a primeiro. Use o encerramento forçado apenas quando o aplicativo estiver travado.
+
+Cada usuário mantém sua própria carteira e senha em `%LOCALAPPDATA%\AporteBrasil\data`. Clonar, atualizar o código ou reiniciar não importa a carteira do autor nem substitui a carteira existente do usuário. Cada instalação abre o arquivo local já existente e pede sua senha; uma instalação sem carteira começa vazia. As migrações de formato continuam sendo tratadas pelo aplicativo, com os backups previstos, sem publicar esses arquivos.
+
+O autor publica alterações de código com `git commit` e `git push`, após as verificações de privacidade. Os outros usuários recebem essas alterações com `git pull`. Não compartilhe a pasta privada nem copie a carteira do autor junto com o projeto. Se o usuário já utiliza uma cópia antiga da plataforma no mesmo Windows, a pasta privada padrão continua sendo a mesma. Para trocar de computador, use o backup criptografado da própria carteira pela interface.
 
 ## IA opcional
 

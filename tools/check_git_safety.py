@@ -35,7 +35,7 @@ def allowed(name):
     parent,base=path.parts
     return (parent=='static' and path.suffix in ('.html','.css','.js','.svg')
         or parent=='tests' and base.startswith('test_') and not base.endswith('_live.py') and base not in LOCAL_TESTS and path.suffix=='.py'
-        or parent=='tools' and base in ('check_git_safety.py','export_source.py','build_windows.ps1','runtime_probe.py','build_installer.py')
+        or parent=='tools' and base in ('check_git_safety.py','export_source.py','build_windows.ps1','runtime_probe.py','prepare_runtime.py','build_installer.py')
         or parent=='packaging' and base in ('Instalar.cmd','Uninstall.ps1','LEIA-ME.txt')
         or parent=='.githooks' and base in ('pre-commit','pre-push'))
 
