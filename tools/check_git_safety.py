@@ -23,6 +23,7 @@ MODULES.add('company_model.py')
 MODULES.add('factor_analysis.py')
 MODULES.add('company_evidence.py')
 MODULES.add('company_batch.py')
+MODULES.add('company_quality.py')
 
 # Ensaios dependentes de bases locais ou de ferramentas offline nao publicadas.
 LOCAL_TESTS={'test_installer.py','test_model_comparison.py','test_company_history.py',

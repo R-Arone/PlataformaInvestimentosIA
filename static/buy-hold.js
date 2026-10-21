@@ -26,7 +26,7 @@ function companyDriversPane(a) {
 
 function buyHoldChecklist(a) {
  const r = a.company_research.study;
- return `<section class="buy-hold-checklist" aria-label="Checklist completo da empresa"><div class="buy-hold-heading"><div><span class="eyebrow">CRITÉRIOS DE ESTUDO · ${r.total} DA EMPRESA + ${r.groups.find(g=>g.key==='price').checks.length} DE PREÇO</span><h3>Checklist completo · ${esc(a.ticker)}</h3></div><div class="check-counts">${tag('✓ '+(r.counts.pass+r.price_counts.pass),'good')}${tag('✕ '+(r.counts.fail+r.price_counts.fail),(r.counts.fail+r.price_counts.fail)?'bad':'')}${tag('? '+(r.counts.unknown+r.price_counts.unknown))}</div></div><div class="company-check-toolbar" aria-label="Filtrar critérios">${[['all','Todos os critérios'],['fail','Pontos de atenção'],['unknown','Dados pendentes']].map(([filter,label])=>`<button type="button" class="button secondary ${filter==='all'?'active':''}" data-action="company-check-filter" data-id="${a.id}" data-filter="${filter}" aria-pressed="${filter==='all'}">${label}</button>`).join('')}</div>${r.groups.map(g=>`<section class="company-check-group" data-check-group="${g.key}"><div class="company-check-group-head"><h4>${esc(g.label)}</h4><span>${g.checks.length} ${g.checks.length===1?'critério':'critérios'}${g.key==='price'?' · não entram no selo da empresa':''}</span></div><div class="buy-hold-grid">${g.checks.map(c=>`<article class="buy-hold-item ${esc(c.status)}" data-check-status="${c.status}"><div class="buy-hold-item-title"><span class="buy-hold-mark" aria-hidden="true">${c.status==='pass'?'✓':c.status==='fail'?'×':c.status==='na'?'—':'?'}</span><div><b>${esc(c.label)}</b><small>${esc(c.status==='na'?'Não se aplica':statusLabel[c.status])}</small></div></div><details><summary>Ver dados e regra</summary><p>${esc(c.detail)}</p>${c.asof?`<small class="date-source">Referência: ${dt(c.asof)}</small>`:''}${c.source_url?`<a href="${esc(c.source_url)}" target="_blank" rel="noreferrer">Conferir fonte ↗</a>`:''}</details></article>`).join('')}</div></section>`).join('')}<p class="company-check-empty muted" hidden>Nenhum critério neste filtro.</p><p class="form-hint">${esc(r.note)}</p></section>`;
+ return `<section class="buy-hold-checklist" aria-label="Checklist completo da empresa"><div class="buy-hold-heading"><div><span class="eyebrow">CRITÉRIOS DE ESTUDO · ${r.total} DA EMPRESA + ${r.groups.find(g=>g.key==='price').checks.length} DE PREÇO</span><h3>Checklist completo · ${esc(a.ticker)}</h3></div><div class="check-counts">${tag('✓ '+(r.counts.pass+r.price_counts.pass),'good')}${tag('✕ '+(r.counts.fail+r.price_counts.fail),(r.counts.fail+r.price_counts.fail)?'bad':'')}${tag('? '+(r.counts.unknown+r.price_counts.unknown))}</div></div><div class="company-check-toolbar" aria-label="Filtrar critérios">${[['all','Todos os critérios'],['fail','Pontos de atenção'],['unknown','Dados pendentes']].map(([filter,label])=>`<button type="button" class="button secondary ${filter==='all'?'active':''}" data-action="company-check-filter" data-id="${a.id}" data-filter="${filter}" aria-pressed="${filter==='all'}">${label}</button>`).join('')}</div>${r.groups.map(g=>`<section class="company-check-group" data-check-group="${g.key}"><div class="company-check-group-head"><h4>${esc(g.label)}</h4>${g.key==='requested'?`<div class="actions">${button('company-quality-facts','Conferir informações e fontes','secondary',`data-id="${a.id}"`)}${button('company-quality-history','Conferir ROE e dívida por ano','secondary',`data-id="${a.id}"`)}</div>`:''}<span>${g.checks.length} ${g.checks.length===1?'critério':'critérios'}${g.key==='price'?' · não entram no selo da empresa':''}</span></div><div class="buy-hold-grid">${g.checks.map(c=>`<article class="buy-hold-item ${esc(c.status)}" data-check-status="${c.status}"><div class="buy-hold-item-title"><span class="buy-hold-mark" aria-hidden="true">${c.status==='pass'?'✓':c.status==='fail'?'×':c.status==='na'?'—':'?'}</span><div><b>${esc(c.label)}</b><small>${esc(c.status==='na'?'Não se aplica':statusLabel[c.status])}</small></div></div><details><summary>Ver dados e regra</summary><p>${esc(c.detail)}</p>${c.asof?`<small class="date-source">Referência: ${dt(c.asof)}</small>`:''}${c.references?.length?c.references.map(ref=>`<a href="${esc(ref.url)}" target="_blank" rel="noreferrer">${ref.asof?'Fonte · '+dt(ref.asof):'Conferir fonte'} ↗</a>`).join(' · '):c.source_url?`<a href="${esc(c.source_url)}" target="_blank" rel="noreferrer">Conferir fonte ↗</a>`:''}</details></article>`).join('')}</div></section>`).join('')}<p class="company-check-empty muted" hidden>Nenhum critério neste filtro.</p><p class="form-hint">${esc(r.note)}</p></section>`;
 }
 
 function companyProfile(a) {
@@ -125,6 +125,52 @@ function companyDividendsForm(a) {
  wireForm('#company-dividends-form',async d=>{const rows=years.filter(year=>d['dy_'+year]!=='').map(year=>({year,dy:Number(d['dy_'+year])}));await api('/api/issuer/dividends',{asset_id:a.id,data:{symbol:bhSymbol(a),years:rows,method:d.method,source_url:d.source_url}});await load();$('#modal').close();companyTabs.set(a.id,'history');detail(a.id);toast('DY anual salvo com a definição da conta.');});
 }
 
+const companyQualityFields=[
+ ['innovation','Investe amplamente em pesquisa e inovação?','bool'],
+ ['obsolete_sector','O setor é obsoleto? Se SIM, inovação é sempre NÃO.','bool'],
+ ['dividend_payments','Tem histórico documentado de pagamento de dividendos?','bool'],
+ ['founded','Data de fundação da empresa (não é o IPO)','date'],
+ ['leadership','Colocação em ranking nacional ou mundial','rank'],
+ ['sector_origin_year','Ano de origem documentada do setor específico','year'],
+ ['blue_chip','É classificada como blue chip no mercado em que atua?','bool'],
+ ['good_management','A gestão é boa, conforme a evidência?','bool'],
+ ['corruption_history','Há histórico comprovado de corrupção? Se SIM, gestão é sempre NÃO.','bool'],
+ ['state_controlled','Existe controle estatal?','bool'],
+ ['single_client_concentration','Existe dependência ou concentração em cliente único?','bool']
+];
+
+function companyQualityFactsForm(a){
+ const old=a.company_research.quality_facts?.data||{symbol:bhSymbol(a),facts:{},annual_metrics:[]};
+ modal('Conferir os critérios · '+a.ticker,`<form id="company-quality-facts-form"><p>Registre uma informação por vez, com a fonte e o fundamento. Notícias, tamanho e opinião da IA não preenchem estes campos automaticamente. Dados não conferidos permanecem pendentes.</p>${select('fact_key','Informação',companyQualityFields.map(([key,label])=>[key,label]),'innovation')}<div id="company-quality-value"></div>${footer('Salvar informação conferida')}</form>`);
+ function show(){
+  const key=$('[name="fact_key"]').value,kind=companyQualityFields.find(r=>r[0]===key)[2],row=old.facts[key],v=row?.value;
+  const value=kind==='bool'?select('value','Resposta',[['unknown','Não verificado'],['yes','Sim'],['no','Não']],v===true?'yes':v===false?'no':'unknown'):
+   kind==='date'?field('value','Fundação comprovada',v||'','date',`max="${S.today}"`):
+   kind==='year'?numField('value','Ano de origem do setor',v??'','min="1" step="1"'):
+   `${numField('rank','Colocação (somente 1 atende)',v?.rank??'','min="1" step="1"')}${select('scope','Âmbito',[['national','Nacional'],['global','Mundial']],v?.scope||'national')}${field('metric','Medida do ranking e mercado coberto',v?.metric||'','text','maxlength="300" placeholder="Ex.: participação em receita no segmento e país, ano de referência"')}`;
+  $('#company-quality-value').innerHTML=`<div class="form-grid">${value}${field('asof','Data da conferência',row?.asof||S.today,'date',`max="${S.today}"`)}${field('source_url','Link da fonte',row?.source_url||'','url','maxlength="1500"')}${textarea('note','Fundamento, escopo e trecho que sustenta a resposta',row?.note||'','maxlength="1500" rows="4"')}</div><p class="form-hint">Para deixar a informação pendente novamente, escolha Não verificado ou apague o valor principal. SIM para inovação exige também confirmar que o setor não é obsoleto; SIM para gestão exige conferir o histórico de corrupção.</p>`;
+ }
+ $('[name="fact_key"]').addEventListener('change',show);show();
+ wireForm('#company-quality-facts-form',async d=>{
+  const kind=companyQualityFields.find(r=>r[0]===d.fact_key)[2],facts={...old.facts};
+  let value=kind==='bool'?(d.value==='unknown'?null:d.value==='yes'):kind==='date'?(d.value||null):kind==='year'?(d.value===''?null:Number(d.value)):(d.rank===''?null:{rank:Number(d.rank),scope:d.scope,metric:d.metric});
+  if(value===null)delete facts[d.fact_key];
+  else{if(!d.source_url||!d.asof||!d.note.trim())throw Error('Informe data, link e fundamento da informação.');facts[d.fact_key]={value,asof:d.asof,source_url:d.source_url,note:d.note};}
+  await api('/api/issuer/quality-facts',{asset_id:a.id,data:{...old,facts}});await load();detail(a.id);toast('Critério salvo com fonte; regras obrigatórias recalculadas.');
+ });
+}
+
+function companyQualityHistoryForm(a){
+ const old=a.company_research.quality_facts?.data||{symbol:bhSymbol(a),facts:{},annual_metrics:[]};
+ const years=Array.from({length:5},(_,i)=>Number(S.today.slice(0,4))-5+i);
+ modal('ROE e dívida históricos · '+a.ticker,`<form id="company-quality-history-form"><p>O aplicativo usa os balanços disponíveis para calcular ROE sobre patrimônio médio e dívida líquida/EBITDA. Aqui você pode conferir ou complementar os cinco exercícios. ROE em percentual; dívida líquida e EBITDA em valores monetários completos, na mesma moeda e unidade em cada ano. EBITDA não positivo não produz um múltiplo válido. Campos vazios não viram zero.</p>${years.map((year,i)=>{const r=old.annual_metrics.find(r=>Number(r.date.slice(0,4))===year)||{};return `<fieldset class="optional-fields"><legend>${year}</legend><div class="form-grid">${field('date_'+i,'Encerramento',r.date||year+'-12-31','date',`max="${S.today}"`)}${numField('roe_'+i,'ROE anual (%)',r.roe??'')}${numField('net_debt_'+i,'Dívida líquida (negativa se caixa líquido)',r.net_debt??'')}${numField('ebitda_'+i,'EBITDA anual',r.ebitda??'')}${field('source_'+i,'Fonte destes valores',r.source_url||'','url','maxlength="1500"')}</div></fieldset>`;}).join('')}${footer('Salvar histórico conferido')}</form>`);
+ wireForm('#company-quality-history-form',async d=>{
+  const annual_metrics=old.annual_metrics.filter(r=>!years.includes(Number(r.date.slice(0,4))));
+  years.forEach((year,i)=>{const values=Object.fromEntries(['roe','net_debt','ebitda'].map(k=>[k,d[k+'_'+i]===''?null:Number(d[k+'_'+i])]));if(Object.values(values).some(v=>v!==null)){if(Number(d['date_'+i].slice(0,4))!==year)throw Error('Confira o ano de encerramento de '+year+'.');annual_metrics.push({date:d['date_'+i],...values,source_url:d['source_'+i]});}});
+  await api('/api/issuer/quality-facts',{asset_id:a.id,data:{...old,annual_metrics}});await load();detail(a.id);toast('ROE e dívida dos cinco anos recalculados.');
+ });
+}
+
 function companyOpinionForm(a) {
  modal('Comentário online · '+a.ticker,`<form id="company-opinion-form"><p>Salve um comentário ou um trecho curto de análise com a fonte original para consultar depois.</p><div class="form-grid">${field('title','Título / assunto','','text','required maxlength="300"')}${field('author','Autor, canal ou comunidade','','text','required maxlength="200"')}${field('date','Data da publicação','','date',`required max="${S.today}"`)}${field('url','Link da publicação','','url','required maxlength="1500"')}${textarea('text','Comentário / trecho curto','','maxlength="2000" rows="6"')}</div>${footer('Salvar comentário com fonte')}</form>`);
  wireForm('#company-opinion-form',async d=>{await api('/api/issuer/opinion',{asset_id:a.id,data:{origin:'manual',title:d.title,author:d.author,date:d.date,url:d.url,text:d.text}});await load();$('#modal').close();companyTabs.set(a.id,'online');detail(a.id);toast('Comentário salvo na área de opiniões.');});
@@ -173,6 +219,8 @@ document.addEventListener('click',async e=>{
    case 'company-open-online':companyTabs.set(a.id,'online');detail(a.id);break;
    case 'company-quarters':companyQuartersForm(a);break;
    case 'company-dividends':companyDividendsForm(a);break;
+   case 'company-quality-facts':companyQualityFactsForm(a);break;
+   case 'company-quality-history':companyQualityHistoryForm(a);break;
    case 'company-opinion':companyOpinionForm(a);break;
    case 'company-governance':companyGovernanceForm(a);break;
    case 'company-exposure':companyExposureForm(a);break;

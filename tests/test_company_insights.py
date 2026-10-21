@@ -266,6 +266,7 @@ class CompanyInsightsTests(unittest.TestCase):
         synthetic=copy.deepcopy(a)
         for c in synthetic['company_research']['buy_hold']['checks']:c['status']='pass'
         for c in synthetic['company_research']['viability']['checks']:c['status']='pass'
+        for c in synthetic['company_research']['requested_quality']['checks']:c['status']='pass'
         for c in synthetic['sector_analysis']['checks']:c['status']='fail' if c['group']!='health' else 'pass'
         with patch.object(sector_analysis,'metric',return_value=(20,{'asof':self.day},'')):
             study=insights.complete_study(app,synthetic)

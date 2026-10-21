@@ -389,10 +389,13 @@ def complete_study(app, a):
     r = a['company_research']; profile = a['sector_analysis']['profile']
     nonfinancial = profile in sector_analysis.NONFINANCIAL_PROFILES
     groups = {k: {'key': k, 'label': label, 'checks': []} for k, label in [
+        ('requested', 'Os 11 critérios adicionais de longo prazo'),
         ('history', 'Histórico e crescimento'), ('returns', 'Rentabilidade e geração de caixa'),
         ('income', 'Dividendos e negociação'), ('governance', 'Governança e proteção do acionista'),
         ('sector', 'Saúde financeira · '+a['sector_analysis']['label']), ('price', 'Preço e custo de oportunidade')]}
     def add(group, check): groups[group]['checks'].append(dict(check))
+    for check in r.get('requested_quality', {}).get('checks', []):
+        add('requested', check)
     for check in r['buy_hold']['checks']:
         key = check['key']
         group = 'income' if key in ('dividends', 'liquidity') else 'returns' if key == 'roe' else 'sector' if key == 'debt_equity' else 'history'

@@ -6,8 +6,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import market_brief
 import company_insights
+import company_quality
 
-KINDS = ('issuer_profile', 'issuer_quarters', 'issuer_market_history', 'issuer_dividend_history', 'issuer_opinions') + company_insights.KINDS
+KINDS = ('issuer_profile', 'issuer_quarters', 'issuer_market_history', 'issuer_dividend_history', 'issuer_opinions', company_quality.KIND) + company_insights.KINDS
 CURRENCIES = ('BRL', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'CHF', 'AUD')
 
 
@@ -24,6 +25,8 @@ def value(app, v, nonnegative=False):
 
 
 def validate_snapshot(app, kind, d):
+    if kind == company_quality.KIND:
+        return company_quality.validate_snapshot(app, d)
     if kind in company_insights.KINDS:
         return company_insights.validate_snapshot(app, kind, d)
     if not isinstance(d, dict) or kind not in KINDS:
@@ -290,6 +293,8 @@ def enrich(app, a):
     r = a['company_research']; snaps = a.get('snapshots', {})
     r['buy_hold'] = checklist(app, a)
     r['viability'] = company_insights.viability(app, a)
+    r['requested_quality'] = company_quality.assess(app, a)
+    r['quality_facts'] = snaps.get(company_quality.KIND)
     r['study'] = company_insights.complete_study(app, a)
     r['sector_focus'] = company_insights.focus(a, app.age)
     r['drivers'] = company_insights.drivers(app, a)

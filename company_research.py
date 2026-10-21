@@ -192,7 +192,7 @@ def inputs(app, a):
           'status':status,'profit':profit,'facts':facts,'untrusted_report_excerpt':report,'annual':annual}
     # Raw snapshot fingerprints work before factor enrichment as well, keeping
     # the saved qualitative reading stale when its supporting evidence changes.
-    evidence_kinds=('issuer_factor_history','issuer_factor_scope','issuer_profile','issuer_statements','stock_financials','issuer_model_assumptions')
+    evidence_kinds=('issuer_factor_history','issuer_factor_scope','issuer_profile','issuer_statements','stock_financials','issuer_model_assumptions','issuer_quality_facts')
     data['reference_hash']=hashlib.sha256(json.dumps({k:snaps[k]['data'] for k in evidence_kinds if k in snaps},sort_keys=True,ensure_ascii=False,allow_nan=False).encode()).hexdigest()
     digest=hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False,allow_nan=False).encode()).hexdigest()
     return data,digest
@@ -436,7 +436,8 @@ def action(app,path,d):
             except ValueError as exc:result['warnings'].append(str(exc))
         return {'ok': True, **result}
     manual_kinds = {'/api/issuer/quarters': 'issuer_quarters', '/api/issuer/dividends': 'issuer_dividend_history',
-                    '/api/issuer/governance': 'issuer_governance', '/api/issuer/exposure': 'issuer_exposure', '/api/issuer/statements': 'issuer_statements'}
+                    '/api/issuer/governance': 'issuer_governance', '/api/issuer/exposure': 'issuer_exposure', '/api/issuer/statements': 'issuer_statements',
+                    '/api/issuer/quality-facts': 'issuer_quality_facts'}
     if path in manual_kinds:
         if set(d) != {'asset_id', 'data'}:
             raise ValueError('Pedido de histórico inválido.')

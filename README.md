@@ -27,7 +27,17 @@ Abra **http://127.0.0.1:8765**. Na primeira execução, crie uma senha local de 
 
 Consultas de mercado precisam de internet; algumas fontes exigem uma chave própria, configurada nas preferências locais.
 
-## Receber uma nova versão sem compartilhar carteiras
+## Os 11 critérios adicionais da análise da empresa
+
+Em **Análise da empresa → Análise completa → Os 11 critérios adicionais de longo prazo**, consulte ROE histórico, crescimento, dividendos, inovação, idade da empresa, liderança, idade do setor, blue chip, gestão, independência e dívida histórica.
+
+ROE exige mais de 5% em cada um dos últimos cinco exercícios completos, usando lucro e patrimônio médio de dois encerramentos positivos ou uma série anual conferida. Crescimento exige CAGR de receita **ou** lucro acima de 5% a.a.: seis observações anuais delimitam os cinco intervalos. O histórico de dividendos confirma pagamentos documentados, sem exigir DY mínimo de 5%. A fundação precisa ser anterior ao aniversário de 30 anos; a data de IPO não substitui a fundação.
+
+Setor obsoleto reprova inovação. Histórico comprovado de corrupção reprova gestão, mesmo com avaliação favorável ou registro antigo. Liderança exige a primeira colocação em ranking nacional ou mundial, com medida, escopo, data e fonte; “uma das líderes” não atende. Blue chip exige classificação fundamentada, sem inferência automática por tamanho ou índice. Independência exige ausência de controle estatal **e** de dependência de cliente único. Dívida líquida/EBITDA deve ser estritamente menor que 2× em cada um dos cinco anos, com EBITDA positivo; para financeiras, o múltiplo não é aplicado como filtro genérico e os critérios prudenciais continuam separados.
+
+Use **Conferir informações e fontes** para registrar uma informação qualitativa por vez e **Conferir ROE e dívida por ano** para completar ou corrigir o histórico. Cada registro exige fonte e data ou exercício; as informações qualitativas exigem fundamento. Dados faltantes continuam pendentes. As evidências ficam na carteira local e nos próprios backups, fora do Git. O checklist original continua disponível e os novos critérios também entram na classificação integrada da empresa.
+
+## Atualização entre usuários
 
 Na pasta clonada, execute:
 
