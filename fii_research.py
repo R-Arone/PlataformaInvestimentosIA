@@ -9,8 +9,9 @@ import urllib.parse
 import company_insights
 import public_reports
 import sector_analysis
+import fii_quality
 
-KINDS=('fii_reports','fii_dividends','fii_drivers','fii_classification')
+KINDS=('fii_reports','fii_dividends','fii_drivers','fii_classification',fii_quality.KIND)
 TYPES={'tijolo':'Imóveis · tijolo','papel':'Recebíveis · papel','hibrido':'Híbrido','fof':'Fundo de fundos','unknown':'Perfil a confirmar'}
 MONTHLY=('nav','equity','shares','assets','yield_nav','amortization','obligations','securitization','cri','funds','property_assets')
 QUARTER=('cash_result','cash_accumulated','declared','ipca_share','igpm_share','short_contracts')
@@ -49,6 +50,7 @@ def subtype(a):
 
 
 def validate_snapshot(app,kind,d):
+    if kind==fii_quality.KIND:return fii_quality.validate_snapshot(app,d)
     if not isinstance(d,dict) or not re.fullmatch(r'[A-Z0-9]{4}11',str(d.get('symbol',''))):raise ValueError('Identificação do FII inválida.')
     if kind=='fii_drivers':
         value=company_insights.validate_snapshot(app,'issuer_drivers',{**d,'symbol':d['symbol']+'.SA'})
@@ -213,7 +215,7 @@ def refresh(app,a):
         received.append('fii_reports');warnings.extend(errors)
     except (ValueError,KeyError,TypeError) as exc:warnings.append(str(exc) if isinstance(exc,ValueError) else 'Formato CVM não reconhecido; histórico anterior preservado.')
     try:
-        query=urllib.parse.urlencode({'symbols':a['ticker'],'startDate':str(app.today().year-3)+'-01-01','endDate':app.today().isoformat()})
+        query=urllib.parse.urlencode({'symbols':a['ticker'],'startDate':str(app.today().year-5)+'-01-01','endDate':app.today().isoformat()})
         raw=app.request_json('https://brapi.dev/api/v2/fii/dividends?'+query,token)
         rows=raw.get('dividends')
         if not isinstance(rows,list) or any(r.get('symbol')!=a['ticker'] for r in rows):raise ValueError('Rendimentos sem identidade confirmada.')
@@ -245,7 +247,9 @@ def refresh(app,a):
 
 def study(app,a):
     profile=subtype(a); groups={k:{'key':k,'label':label,'checks':[]} for k,label in
-        [('history','Patrimônio e histórico'),('income','Resultado e rendimentos'),('sector','Riscos do segmento · '+TYPES[profile]),('price','Preço e comparação') ]}
+        [('requested_fii','Seus seis critérios para FIIs'),('history','Patrimônio e histórico'),('income','Resultado e rendimentos'),('sector','Riscos do segmento · '+TYPES[profile]),('price','Preço e comparação') ]}
+    requested=fii_quality.assess(app,a,profile)
+    groups['requested_fii']['checks']=requested['checks']
     d=a.get('snapshots',{}).get('fii_reports',{}).get('data',{});monthly=d.get('monthly',[]);quarterly=d.get('quarterly',[])
     def add(group,key,label,status,detail,row=None):
         row=row or {};groups[group]['checks'].append({'key':key,'label':label,'status':status,'detail':detail,'asof':row.get('date'),
@@ -278,15 +282,18 @@ def study(app,a):
         v=c['value'];limit=c['limit'];_,s,_=sector_analysis.metric(a,c['metric'],app.age)
         add('price' if c['group']!='health' else 'sector',c['metric'],c['label'],c['status'],
             (f'Valor: {v:g}{c["unit"]}. ' if v is not None else '')+(f'Corte de estudo: {limit:g}{c["unit"]}. ' if limit is not None else '')+c['reason']+' '+c['note'],{'date':s.get('asof'),'source_url':s.get('url','')})
-    quality=[c for k,g in groups.items() if k!='price' for c in g['checks']]
+    quality=[c for k,g in groups.items() if k!='price' for c in g['checks'] if c.get('scope')!='price']
     counts={s:sum(c['status']==s for c in quality) for s in ('pass','fail','unknown','na')};total=len(quality)-counts['na']
-    status='review' if counts['fail'] else 'incomplete' if counts['unknown'] else 'within'
-    price={s:sum(c['status']==s for c in groups['price']['checks']) for s in counts}
+    discard=requested['screening']['discard']
+    status='review' if counts['fail'] or discard else 'incomplete' if counts['unknown'] else 'within'
+    price_checks=groups['price']['checks']+[c for c in requested['checks'] if c.get('scope')=='price']
+    price={s:sum(c['status']==s for c in price_checks) for s in counts}
     return {'groups':list(groups.values()),'counts':counts,'price_counts':price,'total':total,'status':status,
-        'label':{'review':'Pontos de atenção','incomplete':'Avaliação incompleta','within':'Dentro dos critérios de estudo'}[status],
+        'screening':requested['screening'],
+        'label':'Descartado: P/VP acima de 1,5' if discard else {'review':'Pontos de atenção','incomplete':'Avaliação incompleta','within':'Dentro dos critérios de estudo'}[status],
         'coverage':f'{counts["pass"]+counts["fail"]} de {total} critérios do FII com dados',
-        'summary':f'{counts["pass"]} atendem · {counts["fail"]} a revisar · {counts["unknown"]} pendentes',
-        'note':'Critérios próprios de estudo por tipo de fundo. Lucro, ROE, EBITDA e tag along de empresas não são cobrados dos FIIs. Cortes numéricos de triagem são ajustáveis e não certificam o fundo. Preço e notícias não aprovam a qualidade dos ativos.'}
+        'summary':('Descarte pela sua regra de preço. ' if discard else '')+f'{counts["pass"]} atendem · {counts["fail"]} a revisar · {counts["unknown"]} pendentes',
+        'note':'Critérios próprios por tipo de fundo. Lucro, ROE, EBITDA e tag along de empresas não são cobrados dos FIIs. Sua regra fixa de P/VP acima de 1,5 aciona descarte na triagem; os demais cortes gerais continuam ajustáveis. Preço e notícias não aprovam a qualidade dos ativos.'}
 
 
 def enrich(app,a,c):
@@ -301,7 +308,7 @@ def enrich(app,a,c):
         r['explanation']='Juros maiores podem elevar o desconto exigido e os custos de obrigações. Em CRIs ligados ao CDI, podem elevar a receita nominal, enquanto o risco de crédito precisa de revisão. Juros menores podem inverter esses canais; preços também dependem da curva longa, prêmios e qualidade dos ativos.' if r['key']=='rates' else 'O dólar pode afetar custos de construção e a atividade dos locatários/devedores; confirme a exposição dos contratos. Não há efeito direto uniforme sobre os FIIs.'
     drivers['note']='Canais de impacto para FIIs, sem projeção de preço. Compare Selic e curva longa, CDI/IPCA dos recebíveis, reajustes dos aluguéis e capacidade de pagamento. IPCA e IGP-M exibidos abaixo são pesos dos contratos divulgados, não previsões de inflação.'
     a['fii_research']={'type':typ,'type_label':TYPES[typ],'types':TYPES,'reports':a['snapshots'].get('fii_reports'),
-        'dividends':a['snapshots'].get('fii_dividends'),'study':study(app,a),'sector_focus':focus,'drivers':drivers,
+        'dividends':a['snapshots'].get('fii_dividends'),'quality_facts':a['snapshots'].get(fii_quality.KIND),'study':study(app,a),'sector_focus':focus,'drivers':drivers,
         'attempt':app.read_cache(c,'fii_attempt_'+str(a['id']),{}),'news_context':None}
 
 
@@ -315,6 +322,6 @@ def action(app,path,d):
         adapted={**a,'ticker':a['ticker'],'snapshots':{**a['snapshots'],'issuer_drivers':a['snapshots'].get('fii_drivers',{})}}
         payload=company_insights.fetch_drivers(app,adapted);payload['symbol']=a['ticker']
         save(app,a,'fii_drivers',payload,'Banco Central · fatores de mercado do FII');return {'ok':True,'warnings':payload['warnings']}
-    kind={'/api/fii/classification':'fii_classification'}.get(path)
+    kind={'/api/fii/classification':'fii_classification','/api/fii/quality-facts':fii_quality.KIND}.get(path)
     if not kind or set(d)!={'asset_id','data'}:raise ValueError('Ação do FII inválida.')
-    save(app,a,kind,d['data'],'Manual · perfil conferido do FII');return {'ok':True}
+    save(app,a,kind,d['data'],'Manual · critérios conferidos do FII' if kind==fii_quality.KIND else 'Manual · perfil conferido do FII');return {'ok':True}

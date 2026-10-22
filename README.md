@@ -37,7 +37,20 @@ Setor obsoleto reprova inovação. Histórico comprovado de corrupção reprova 
 
 Use **Conferir informações e fontes** para registrar uma informação qualitativa por vez e **Conferir ROE e dívida por ano** para completar ou corrigir o histórico. Cada registro exige fonte e data ou exercício; as informações qualitativas exigem fundamento. Dados faltantes continuam pendentes. As evidências ficam na carteira local e nos próprios backups, fora do Git. O checklist original continua disponível e os novos critérios também entram na classificação integrada da empresa.
 
-## Atualização entre usuários
+## Seis critérios adicionais para fundos imobiliários
+
+Em **Análise do FII → Análise completa → Seus seis critérios para FIIs**, cada item tem **Editar**, resultado, regra, fonte e data:
+
+- **Localização:** regiões nobres confirmadas por evidência da carteira; cidade e vacância não substituem a análise da localização.
+- **Propriedades:** exige imóveis novos **e** ausência de manutenção excessiva, sem presumir um limite universal de idade ou despesas.
+- **P/VP:** abaixo de 1× atende ao desconto; de 1× até 1,5× não atende. **Acima de 1,5× aciona descarte na triagem**, com aviso no selo e na lista de FIIs. Exatamente 1,5× não aciona o descarte. A regra fixa prevalece sobre os demais critérios e não executa operações.
+- **Dividendos:** consistência mensal por mais de quatro anos: 49 meses completos com pagamentos positivos confirmados, ou conferência documental do intervalo e da regularidade. Amortizações, datas ex e eventos estimados não comprovam os pagamentos. Falta de coleta fica pendente.
+- **Dependência:** exige conferir separadamente inquilinos/grupos econômicos e imóveis. Vários prédios não comprovam vários inquilinos. Um imóvel com 100% da receita divulgada reprova o critério.
+- **Setor e yield:** compara DY do fundo com média aritmética de ao menos dois outros FIIs do mesmo tipo **e** segmento, na mesma data-base e janela de pagamentos de 12 meses. A fonte deve identificar a população ou amostra. DY patrimonial mensal e mediana não substituem essa média; a lista pessoal de acompanhamento não vira automaticamente média do mercado.
+
+Papel e fundos de fundos mantêm os critérios de crédito e fundos investidos; os três critérios de imóveis físicos ficam como não aplicáveis. Perfil desconhecido e dados sem evidência permanecem pendentes. P/VP usa referência de até sete dias; yield comparável, até 31 dias; informações qualitativas, até 180 dias. As conferências ficam na carteira e nos backups locais, fora do repositório.
+
+## Receber atualizações de código
 
 Na pasta clonada, execute:
 
