@@ -4,6 +4,7 @@ from datetime import date
 import math
 import fii_quality
 import portfolio_strategy
+import investment_exposure
 
 
 REFERENCES = [
@@ -38,7 +39,7 @@ def money_cents(value, rounding=ROUND_HALF_UP):
 
 
 def options(app, data):
-    allowed = {'amount', 'mode', 'universe', 'max_assets', 'min_coverage', 'accept_estimates'}
+    allowed = {'amount', 'mode', 'universe', 'max_assets', 'min_coverage', 'accept_estimates', 'allocation_style', 'min_ticket'}
     if not isinstance(data, dict) or set(data)-allowed:
         raise ValueError('Opções do aporte de longo prazo inválidas.')
     if isinstance(data.get('amount'), bool): raise ValueError('Informe o valor do aporte.')
@@ -46,7 +47,11 @@ def options(app, data):
     mode, universe = data.get('mode', 'base'), data.get('universe', 'all')
     if mode not in ('base', 'context') or universe not in ('all', 'held'):
         raise ValueError('Escolha a versão e a lista de ativos.')
-    limit = data.get('max_assets', 10)
+    style=data.get('allocation_style','gradual')
+    if style not in ('gradual','balanced'):raise ValueError('Escolha poucos destinos ou rebalanceamento proporcional.')
+    limit = data.get('max_assets', 2)
+    if isinstance(data.get('min_ticket',500),bool):raise ValueError('Informe um valor mínimo por destino.')
+    ticket=app.number(data.get('min_ticket',500),True,0,1e12)
     coverage = data.get('min_coverage', 70)
     if isinstance(limit, bool) or str(limit) not in tuple(str(n) for n in range(1, 21)):
         raise ValueError('Escolha entre 1 e 20 destinos.')
@@ -56,6 +61,7 @@ def options(app, data):
         raise ValueError('Confirme explicitamente o uso de saldos estimados.')
     return dict(amount=money_cents(amount)/100, mode=mode, universe=universe,
                 max_assets=int(limit), min_coverage=coverage,
+                allocation_style=style,min_ticket=money_cents(ticket)/100,
                 accept_estimates=data.get('accept_estimates', False))
 
 
@@ -175,7 +181,7 @@ def candidate(app, asset, state, opts, budgets):
                     if c.get('key') == 'fii_quality_yield']
     if any(c['status'] == 'fail' for c in price_checks):
         reasons.append('Yield abaixo da média documentada dos FIIs comparáveis.')
-    if not budgets.get(cls): reasons.append('Classe sem déficit para este aporte segundo suas metas.')
+    if not budgets.get(cls): reasons.append('Classe adiada neste cenário de poucos destinos; confira a próxima prioridade.' if opts.get('allocation_style')=='gradual' and class_row['target']>class_row['weight'] else 'Classe sem orçamento neste cenário segundo suas metas.')
     if opts['universe'] == 'held' and not item['held']: reasons.append('Ativo fora da carteira; filtro selecionado: somente posições atuais.')
     if sector(asset) == 'não classificado': reasons.append('Classifique o setor antes de aplicar limites de concentração.')
     target = class_row['target']/100*(allocation['total']+opts['amount'])
@@ -193,7 +199,7 @@ def candidate(app, asset, state, opts, budgets):
                 eligible=not reasons, reasons=list(dict.fromkeys(reasons)), amount=0, quantity=0)
 
 
-def allocate(state, rows, budgets, max_assets):
+def allocate(state, rows, budgets, max_assets, min_ticket=0, available=None):
     """Whole units, cents, and caps recomputed on the actually invested portfolio.
 
     Start with the maximum possible invested denominator, then monotonically reduce
@@ -210,7 +216,8 @@ def allocate(state, rows, budgets, max_assets):
     asset_limit = Decimal(str(cfg['asset_limit']))/100
     sector_limit = Decimal(str(cfg['sector_limit']))/100
     choices = [r for r in rows if r['eligible']]
-    denominator = before+Decimal(sum(budgets.get(r, 0) for r in {c['class_key'] for c in choices}))/100
+    available=sum(budgets.get(r, 0) for r in {c['class_key'] for c in choices}) if available is None else available
+    denominator = before+Decimal(available)/100
     stable = False
     for _ in range(300):
         remaining = dict(budgets); used_assets = dict(asset_values); used_sectors = dict(sector_values)
@@ -227,6 +234,8 @@ def allocate(state, rows, budgets, max_assets):
             if quantity <= 0: continue
             if len(purchases) >= max_assets: break
             cents = quantity*unit; purchases[row['id']] = (cents, quantity)
+            if cents<money_cents(min_ticket):
+                purchases.pop(row['id']);continue
             remaining[row['class_key']] -= cents; seen.add(key)
             total_room -= cents
             used_assets[key] = used_assets.get(key, Decimal('0'))+Decimal(cents)/100
@@ -249,26 +258,34 @@ def allocate(state, rows, budgets, max_assets):
     return stable
 
 
-def recommend(app, data):
-    opts = options(app, data)
-    state = app.state(); allocation = state['allocation']
-    if not allocation['has_targets']: raise ValueError('Salve suas metas em Metas e aportes antes de gerar sugestões.')
-    if allocation['issues'] and not opts['accept_estimates']:
-        raise ValueError('Atualize os saldos e classificações ou confirme o uso das estimativas da carteira.')
+def suggestion(app, state, opts):
+    allocation=state['allocation']
     cents = money_cents(opts['amount'])
-    _, budgets, _ = portfolio_strategy.distribution(allocation, {}, cents, app.number)
-    rows = [candidate(app, asset, state, opts, budgets) for asset in state['assets']]
-    rows.sort(key=lambda r:(not r['eligible'], -(r['priority'] if r['priority'] is not None else -1), r['ticker']))
-    stable = allocate(state, rows, budgets, opts['max_assets'])
+    _, ideal, _ = portfolio_strategy.distribution(allocation, {}, cents, app.number)
+    order=lambda r:(not r['eligible'], -(r['priority'] if r['priority'] is not None else -1), r['ticker'])
+    seed=sorted((candidate(app,a,state,{**opts,'allocation_style':'balanced'},ideal) for a in state['assets']),key=order)
+    selected=[];issuers=set()
+    for row in seed:
+        if not row['eligible'] or row['issuer'] in issuers:continue
+        issuers.add(row['issuer']);selected.append(row['class_key'])
+        if len(selected)>=opts['max_assets']:break
+    selected=list(dict.fromkeys(selected))
+    gradual=opts['allocation_style']=='gradual' and bool(selected)
+    budgets={key:cents if key in selected else 0 for key in ideal} if gradual else dict(ideal)
+    rows=sorted((candidate(app,a,state,opts,budgets) for a in state['assets']),key=order)
+    stable = allocate(state, rows, budgets, opts['max_assets'],opts['min_ticket'],cents)
     if opts['mode'] == 'context':
         lookup = {a['id']:a for a in state['assets']}
         for row in rows: row['context'] = context(app, lookup[row['id']], row['eligible'])
     spent = sum(money_cents(r['amount']) for r in rows)
+    if gradual:
+        budgets={key:sum(money_cents(r['amount']) for r in rows if r['class_key']==key) for key in ideal}
+        budgets[selected[0]]+=cents-spent
     final_total = allocation['total']+opts['amount']
     classes = []
     for cls in allocation['classes']:
         used = sum(money_cents(r['amount']) for r in rows if r['class_key'] == cls['key'])
-        classes.append({**cls, 'budget':budgets[cls['key']]/100, 'suggested':used/100,
+        classes.append({**cls, 'budget':budgets[cls['key']]/100, 'ideal_budget':ideal[cls['key']]/100,'suggested':used/100,
                         'pending':(budgets[cls['key']]-used)/100,
                         'after_weight':(cls['value']+used/100)/final_total*100 if final_total else 0})
     warnings = list(allocation['issues'])
@@ -276,11 +293,15 @@ def recommend(app, data):
         warnings.append('Os limites por emissor/setor, os preços unitários e o número de destinos impediram uma distribuição válida. '
                         'Em uma carteira nova, pode ser necessário ampliar os destinos para diversificar; o saldo sem investir não reduz a concentração.')
     if not stable: warnings.append('Não foi possível estabilizar os limites de concentração; nenhum valor foi destinado.')
+    if opts['allocation_style']=='gradual':warnings.append('Poucos destinos: as metas por classe orientam a prioridade, mas podem ficar temporariamente desequilibradas. Os limites por emissor e setor continuam obrigatórios.')
     for row in rows:
         row['allocation_note'] = ('Sugestão de aporte, sujeita a custos e preço de execução.' if row['amount'] else
-            'Sem valor destinado: limite de concentração, prioridade, quantidade de destinos ou orçamento insuficiente para uma unidade.'
+            'Sem valor destinado: limite de concentração, prioridade, quantidade de destinos, aporte mínimo ou orçamento insuficiente para uma unidade.'
             if row['eligible'] else 'Aguardar e resolver as pendências antes de aportar.')
     return dict(options=opts, amount=opts['amount'], invested=spent/100, unassigned=(cents-spent)/100,
+                distance_before=sum(abs(r['weight']-r['target']) for r in classes)/2,
+                distance_after=(sum(abs(r['after_weight']-r['target']) for r in classes)+(cents-spent)/100/final_total*100)/2,
+                next_classes=[dict(key=r['key'],label=r['label'],gap=max(0,r['target']/100*final_total-r['value']-r['suggested'])) for r in classes if r['after_weight']<r['target']-.01],
                 unassigned_weight=(cents-spent)/100/final_total*100, candidates=rows, classes=classes,
                 warnings=warnings, references=REFERENCES, method=METHOD, generated_at=app.now(),
                 limits=dict(asset=state['settings']['asset_limit'], sector=state['settings']['sector_limit'],
@@ -289,3 +310,20 @@ def recommend(app, data):
                      'Quantidades inteiras estimadas ao último preço disponível; corretagem, emolumentos, spread e variação da execução não estão incluídos. '
                      'Valores sem oportunidade ou de classes sem seleção de produto ficam a decidir. O VPA de FII é contábil; preços das ações são condicionais às premissas salvas. '
                      'As pesquisas citadas não validam estes pesos, cortes, checklist ou aplicação em FIIs; não há previsão de retorno ou backtest desta estratégia.')
+
+
+def recommend(app, data):
+    opts=options(app,data);state=app.state();allocation=state['allocation']
+    if not allocation['has_targets']:raise ValueError('Salve suas metas em Metas e aportes antes de gerar sugestões.')
+    if allocation['issues'] and not opts['accept_estimates']:
+        raise ValueError('Atualize os saldos e classificações ou confirme o uso das estimativas da carteira.')
+    result=suggestion(app,state,opts)
+    result['exposure_areas']=state.get('exposure_areas',[])
+    result['comparisons']=[]
+    for style,limit,label in [('gradual',1,'Um destino agora'),('gradual',2,'Até dois destinos'),('gradual',3,'Até três destinos'),('balanced',20,'Distribuição proporcional')]:
+        scenario_opts={**opts,'allocation_style':style,'max_assets':limit,'mode':'base'}
+        scenario=result if style==opts['allocation_style'] and limit==opts['max_assets'] else suggestion(app,state,scenario_opts)
+        result['comparisons'].append(dict(label=label,allocation_style=style,max_assets=limit,invested=scenario['invested'],
+            unassigned=scenario['unassigned'],distance_after=scenario['distance_after'],
+            destinations=[dict(id=r['id'],ticker=r['ticker'],amount=r['amount'],quantity=r['quantity']) for r in scenario['candidates'] if r['amount']]))
+    return result

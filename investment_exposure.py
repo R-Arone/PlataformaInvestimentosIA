@@ -15,6 +15,11 @@ CDA = 'https://dados.cvm.gov.br/dataset/fi-doc-cda'
 SSGA = 'https://www.ssga.com/us/en/intermediary/capabilities/equities/sector-investing/select-sector-etfs'
 B3 = 'https://www.b3.com.br/pt_br/noticias/bdr-8AA8D0CC9E28FC2E019EB37004F01F47.htm'
 CHECKED = '2026-10-06'
+THEMES = {'bitcoin':'Bitcoin', 'crypto_basket':'Cesta de criptoativos', 'debentures':'Debêntures',
+          'private_credit':'Crédito privado', 'treasury_selic':'Tesouro / pós-fixados',
+          'inflation_bonds':'Títulos ligados à inflação', 'brazil_equity':'Ações brasileiras',
+          'us_equity':'Ações dos EUA', 'global_equity':'Ações globais'}
+OPTIONAL_META = {'asset_class', 'themes'}
 
 
 def entry(ticker, name, typ, market, scope, profiles, focus, benchmark, url, asset_class='equity'):
@@ -44,10 +49,23 @@ CATALOG = {r['ticker']: r for r in [
 ]}
 for ticker, area in {'XLK': 'technology', 'XLF': 'financial', 'XLE': 'energy', 'XLV': 'health-care', 'XLI': 'industrial', 'XLU': 'utilities'}.items():
     CATALOG[ticker]['composition_url'] = f'https://www.ssga.com/us/en/individual/etfs/state-street-{area}-select-sector-spdr-etf-{ticker.lower()}'
+for ticker, themes in {'BOVA11':['brazil_equity'], 'IVVB11':['us_equity'], 'WRLD11':['global_equity'],
+                       'IMAB11':['inflation_bonds'], 'LFTB11':['treasury_selic','inflation_bonds'],
+                       'HASH11':['crypto_basket']}.items():
+    CATALOG[ticker]['themes'] = themes
+for row in (
+    entry('DEBB11','BTG Pactual Teva Debêntures DI','etf','B3','BR',['fixed_income'],'sector',
+          'Índice Teva Debêntures DI','https://www.btgpactual.com/asset-management/etf-debentures','fixed_income'),
+    entry('ABTC11','BTG Pactual Teva Bitcoin Fear','etf','B3','GLOBAL',['crypto_market','fixed_income'],'mixed',
+          'Teva Bitcoin Fear Arbitrage · Bitcoin e renda fixa; pesos dinâmicos',
+          'https://www.btgpactual.com/asset-management/etf/ABTC11','mixed')):
+    row['asof']='2026-10-21'
+    row['themes']=['debentures','private_credit'] if row['ticker']=='DEBB11' else ['bitcoin','treasury_selic','inflation_bonds']
+    CATALOG[row['ticker']]=row
 META_KEYS = {'scope', 'profiles', 'focus', 'benchmark', 'source_url', 'asof', 'composition_url', 'analysis_url'}
 
 def meta_fields(d):
-    return {k:copy.deepcopy(d[k]) for k in META_KEYS | ({'asset_class'} if 'asset_class' in d else set())}
+    return {k:copy.deepcopy(d[k]) for k in META_KEYS | (OPTIONAL_META & set(d))}
 
 
 def links(ticker, typ, market='B3'):
@@ -69,7 +87,7 @@ def targets(s):
 
 
 def validate_meta(app, meta):
-    if not isinstance(meta, dict) or set(meta) not in (META_KEYS, META_KEYS|{'asset_class'}) or not isinstance(meta['scope'], str) or not isinstance(meta['focus'], str) or meta['scope'] not in REGIONS or meta['focus'] not in FOCUS:
+    if not isinstance(meta, dict) or not META_KEYS <= set(meta) <= META_KEYS|OPTIONAL_META or not isinstance(meta['scope'], str) or not isinstance(meta['focus'], str) or meta['scope'] not in REGIONS or meta['focus'] not in FOCUS:
         raise ValueError('Exposição inválida.')
     if 'asset_class' in meta and (not isinstance(meta['asset_class'],str) or meta['asset_class'] not in CLASSES):
         raise ValueError('Área de investimento inválida.')
@@ -84,12 +102,19 @@ def validate_meta(app, meta):
         raise ValueError('Os setores precisam corresponder à área de investimento escolhida.')
     if family == 'equity' and set(profiles) & {'fixed_income', 'crypto_market', 'fii'}:
         raise ValueError('Renda variável de ações precisa de setores de empresas.')
+    themes=meta.get('themes',[])
+    if not isinstance(themes,list) or len(themes)>len(THEMES) or any(not isinstance(t,str) or t not in THEMES for t in themes) or len(themes)!=len(set(themes)):
+        raise ValueError('Áreas temáticas inválidas.')
+    for theme in themes:
+        expected='crypto_market' if theme in ('bitcoin','crypto_basket') else 'fixed_income' if theme in ('debentures','private_credit','treasury_selic','inflation_bonds') else None
+        if expected and expected not in profiles:raise ValueError('A área temática precisa corresponder aos setores informados.')
+        if not expected and family not in (None,'equity','mixed'):raise ValueError('A área de ações precisa de uma exposição de ações ou mista.')
     out = {**meta, 'profiles': list(dict.fromkeys(profiles)), 'benchmark': app.text_value(meta['benchmark'], 200), 'asof': app.text_value(meta['asof'], 10)}
     for key in ('source_url', 'analysis_url', 'composition_url'):
         out[key] = app.validate_url(meta[key])
     if out['asof'] and app.valid_date(out['asof']) > app.today().isoformat():
         raise ValueError('Exposição com data futura.')
-    if meta['focus'] != 'unknown' and (not out['source_url'] or not out['asof']):
+    if (meta['focus'] != 'unknown' or themes) and (not out['source_url'] or not out['asof']):
         raise ValueError('Informe a fonte e a data da exposição que conferiu.')
     return out
 
@@ -131,7 +156,53 @@ def metadata(a, saved):
         out.update(scope='US' if typ == 'foreign' else 'BR',
                    profiles=[sector_analysis.profile({**a, 'asset_type': 'stock'})] if typ != 'fii' else ['fii'],
                    focus='sector', asset_class='real_estate' if typ=='fii' else 'equity', basis='Setor informado no cadastro; conferir exposição efetiva')
+    if typ=='crypto':
+        out.update(scope='GLOBAL',profiles=['crypto_market'],focus='sector',asset_class='crypto',themes=['bitcoin'],
+                   asof=CHECKED,source_url='https://www.coinbase.com/price/bitcoin',basis='Bitcoin direto · tipo de ativo do cadastro')
     return out
+
+
+def etf_sector(asset):
+    meta=asset.get('exposure') or metadata({**asset,'asset_type':'etf'}, {})
+    themes=set(meta.get('themes',[]))
+    if meta.get('asset_class')=='mixed':
+        return 'ETF · Bitcoin e renda fixa (dinâmico)' if 'bitcoin' in themes else 'ETF · Múltiplas exposições'
+    if 'debentures' in themes:return 'ETF · Debêntures / crédito privado'
+    return {'fixed_income':'ETF · Renda fixa','crypto':'ETF · Cripto','real_estate':'ETF · Imobiliário'}.get(meta.get('asset_class'),
+        ('ETF · Ações Brasil' if meta.get('scope')=='BR' else 'ETF · Ações exterior') if meta.get('asset_class')=='equity' else 'ETF · A definir')
+
+
+def area_keys(meta):
+    return ['theme:'+t for t in meta.get('themes',[])]+['sector:'+p for p in meta.get('profiles',[]) if p not in ('general','etf','foreign','crypto')]
+
+
+def areas(assets, fixed, saved, age):
+    """Presence of related positions; product values are never look-through weights."""
+    groups={}
+    def add(entity,name,value,held,meta,estimated):
+        for key in area_keys(meta):
+            kind,ident=key.split(':',1)
+            label=THEMES[ident] if kind=='theme' else sector_analysis.PROFILES[ident]['label']
+            group=groups.setdefault(key,dict(key=key,label=label,members=[]))
+            group['members'].append(dict(entity=entity,name=name,held=held,value=value,estimated=estimated,
+                partial=meta.get('asset_class')=='mixed' or meta.get('focus')=='mixed',
+                scope=meta.get('scope','UNKNOWN'),source_url=meta.get('source_url',''),asof=meta.get('asof','')))
+    for asset in assets:
+        meta=asset.get('exposure') or metadata(asset,saved)
+        add('asset:'+asset['ticker'],asset['ticker'],asset['value'],asset['position']['quantity']>0,meta,
+            bool(asset.get('value_at_cost') or age(asset.get('snapshots',{}).get('quote',{}).get('asof'))>7))
+    for fund in fixed:
+        meta=saved.get('fund:'+str(fund['id'])) if is_fund(fund) else None
+        if not meta and fund['type'] in ('Tesouro','CDB','LCI','LCA','CRI','CRA','CDB/LCI/LCA','Fundo de renda fixa'):
+            meta=dict(profiles=['fixed_income'],asset_class='fixed_income',scope='BR',themes=[])
+            if fund['type'] in ('CDB','LCI','LCA','CRI','CRA','CDB/LCI/LCA'):meta['themes']=['private_credit']
+        if meta:add('fund:'+str(fund['id']),fund['name'],fund['balance'],fund['balance']>0,meta,age(fund.get('balance_date'))>60)
+    for group in groups.values():
+        group['members'].sort(key=lambda r:(not r['held'],r['name']))
+        group['has_position']=any(r['held'] for r in group['members'])
+        group['held_count']=sum(r['held'] for r in group['members'])
+        group['watched_count']=sum(not r['held'] for r in group['members'])
+    return sorted(groups.values(),key=lambda r:(not r['has_position'],r['label']))
 
 
 def instrument(a, saved):
@@ -150,7 +221,7 @@ def instrument(a, saved):
 
 
 def validate_snapshot_meta(app, meta):
-    if not isinstance(meta, dict) or set(meta) - {'basis','asset_class'} != META_KEYS:
+    if not isinstance(meta, dict) or set(meta) - ({'basis'}|OPTIONAL_META) != META_KEYS:
         raise ValueError('Metadados de exposição inválidos.')
     plain = meta_fields(meta)
     if meta.get('basis') == 'Setor informado no cadastro; conferir exposição efetiva' and not plain['source_url'] and not plain['asof']:
@@ -200,8 +271,8 @@ def validate_record_extras(app, record):
         validate_snapshot_meta(app, f['exposure'])
         validate_quote(app, f['quote'])
     for r in record.get('candidates', []):
-        keys = set(next(iter(CATALOG.values()))) | {'quote', 'direction', 'coverage', 'matched'}
-        if not isinstance(r, dict) or set(r) not in (keys,keys-{'asset_class'}) or not re.fullmatch(r'[A-Z0-9.\-]{1,15}', r['ticker']) or r['type'] not in ('bdr', 'etf') or r['market'] not in ('B3', 'US') or r['direction'] not in DIRECTIONS or r['currency'] != ('USD' if r['market'] == 'US' else 'BRL'):
+        keys = (set(next(iter(CATALOG.values()))) - OPTIONAL_META) | {'quote', 'direction', 'coverage', 'matched'}
+        if not isinstance(r, dict) or not keys <= set(r) <= keys|OPTIONAL_META or not re.fullmatch(r'[A-Z0-9.\-]{1,15}', r['ticker']) or r['type'] not in ('bdr', 'etf') or r['market'] not in ('B3', 'US') or r['direction'] not in DIRECTIONS or r['currency'] != ('USD' if r['market'] == 'US' else 'BRL'):
             raise ValueError('Referência de ETF/BDR inválida.')
         validate_meta(app, meta_fields(r))
         validate_quote(app, r['quote'])

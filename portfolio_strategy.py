@@ -30,6 +30,12 @@ def classify(item,is_fixed=False):
     if typ=='fii':return 'fii'
     if typ=='crypto':return 'crypto'
     if typ=='etf':
+        import investment_exposure
+        meta=item.get('exposure') or investment_exposure.metadata({**item,'ticker':item.get('ticker','')},{})
+        family=meta.get('asset_class')
+        if family=='mixed':return 'other'
+        if family in ('fixed_income','crypto','real_estate'):return {'fixed_income':'rf','crypto':'crypto','real_estate':'fii'}[family]
+        if family=='equity':return 'national' if meta.get('scope')=='BR' else 'international' if meta.get('scope') in ('US','GLOBAL','EU','EM') else 'other'
         return {'ETF · Ações Brasil':'national','ETF · Ações exterior':'international','ETF · Renda fixa':'rf','ETF · Cripto':'crypto'}.get(sector,'other')
     return 'national'
 

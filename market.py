@@ -39,7 +39,8 @@ SOURCE_URLS = {
 def normalize_sector(item, typ):
     sub = str(item.get('subsector') or '').strip()
     if typ == 'etf':
-        return 'ETF · A definir'
+        from investment_exposure import etf_sector
+        return etf_sector({'ticker':str(item.get('symbol') or '').upper(),'asset_type':'etf'})
     if typ == 'fii':
         return 'FII · ' + sub if sub and sub not in ('Fundos Imobiliários', 'Outros') else 'FII · A definir'
     aliases = {'Bancos Diversificados': 'Bancos', 'Exploração. Refino e Distribuição': 'Petróleo e gás',

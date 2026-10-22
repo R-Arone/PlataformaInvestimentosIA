@@ -447,6 +447,11 @@ def state():
                                    'retrieved_at': r['retrieved_at']}
                 for r in c.execute("SELECT asof,data,retrieved_at FROM snapshots WHERE asset_id=? AND kind='quote' ORDER BY id DESC LIMIT 90", (a['id'],))][::-1]
             assets.append(a)
+        saved_exposures=read_cache(c,'investment_exposures',{})
+        for a in assets:
+            a['exposure']=investment_exposure.metadata(a,saved_exposures)
+            if a['asset_type']=='etf' and a['exposure'].get('asset_class')!='unknown' and (a['sector'] in ('ETF','Não classificado') or a['sector'].startswith('ETF ·')):
+                a['sector']=investment_exposure.etf_sector(a)
         public_cfg = {k: v for k, v in cfg.items() if k != 'brapi_token'}
         public_cfg['has_token'] = bool(cfg.get('brapi_token') or os.getenv('BRAPI_TOKEN'))
         sector_options = sorted(set(BASE_SECTORS + [r['sector'] for r in c.execute('SELECT DISTINCT sector FROM catalog')] + [a['sector'] for a in assets] + cfg['sectors']))
@@ -488,6 +493,8 @@ def state():
                 a['fii_research']['news_context']=company_research.company_history.company_insights.news_context(
                     sys.modules[__name__],a,news_feeds,ai_state['sentiment'])
         return {'assets': assets,
+                'exposure_areas':investment_exposure.areas(assets,fixed,saved_exposures,age),
+                'exposure_themes':investment_exposure.THEMES,
                 'issuer_auto':read_cache(c,'issuer_auto',True),
                 'coupling':portfolio_coupling.analyze(assets,fixed,today(),now()),
                 'signals':signal_state,

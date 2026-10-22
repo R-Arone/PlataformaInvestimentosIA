@@ -49,7 +49,7 @@ def fixture(count=6):
 
 class LongTermTests(unittest.TestCase):
     def run_plan(self, local=None, **values):
-        return long_term.recommend(local or fixture(), {'amount':1000, **values})
+        return long_term.recommend(local or fixture(), {'amount':1000,'allocation_style':'balanced','max_assets':10,'min_ticket':0, **values})
 
     def test_budget_whole_units_exact_money_and_final_risk(self):
         local=fixture(); before=copy.deepcopy(local.data)
@@ -238,10 +238,67 @@ class LongTermTests(unittest.TestCase):
     def test_validation_and_no_goals(self):
         for extra in ({'amount':True},{'amount':float('nan')},{'max_assets':True},{'max_assets':1.5},
                       {'max_assets':21},{'min_coverage':49},{'min_coverage':True},{'accept_estimates':'true'},
-                      {'mode':'forecast'},{'universe':'internet'},{'unknown':1}):
+                      {'mode':'forecast'},{'universe':'internet'},{'unknown':1},{'min_ticket':True},{'min_ticket':-1},{'allocation_style':'guess'}):
             with self.subTest(extra=extra),self.assertRaises(ValueError):self.run_plan(**extra)
         local=fixture();local.data['allocation']['has_targets']=False
         with self.assertRaisesRegex(ValueError,'metas'):self.run_plan(local)
+
+    def established_portfolio(self):
+        local=fixture(20)
+        for row in local.data['assets']:row.update(value=1000,position={'quantity':100})
+        local.data['fixed']=[dict(id=1,name='CDB fictício',type='CDB',balance=20000,balance_date=local.today().isoformat(),metadata={})]
+        cfg=local.data['settings'];cfg['allocation_targets'].update(national=50,rf=50)
+        local.data['allocation']=portfolio_strategy.allocation(local.data['assets'],local.data['fixed'],cfg,local.age)
+        return local
+
+    def test_default_is_few_destinations_with_adjustable_minimum(self):
+        opts=long_term.options(fixture(),{'amount':5000})
+        self.assertEqual(opts['allocation_style'],'gradual');self.assertEqual(opts['max_assets'],2)
+        self.assertEqual(opts['min_ticket'],500)
+
+    def test_fewer_destinations_can_defer_soft_goals_but_not_risk_caps(self):
+        p=self.run_plan(self.established_portfolio(),amount=5000,allocation_style='gradual',max_assets=2,min_ticket=500)
+        buys=[r for r in p['candidates'] if r['amount']]
+        self.assertEqual(len(buys),2);self.assertEqual(p['invested'],5000)
+        self.assertTrue(all(r['amount']>=500 and r['after_issuer_weight']<=20 for r in buys))
+        national=next(r for r in p['classes'] if r['key']=='national')
+        fixed=next(r for r in p['classes'] if r['key']=='rf')
+        self.assertGreater(national['after_weight'],national['target'])
+        self.assertEqual(national['ideal_budget'],2500);self.assertEqual(national['budget'],5000)
+        self.assertEqual(fixed['budget'],0)
+        self.assertEqual(next(r for r in p['next_classes'] if r['key']=='rf')['gap'],2500)
+        self.assertEqual(sum(r['budget'] for r in p['classes']),5000)
+        self.assertEqual(len(p['comparisons']),4)
+        balanced=next(c for c in p['comparisons'] if c['allocation_style']=='balanced')
+        self.assertEqual(balanced['invested'],2500)
+        self.assertEqual(balanced['unassigned'],2500)
+
+    def test_next_contribution_recomputes_priority_without_promised_schedule(self):
+        local=self.established_portfolio()
+        p=self.run_plan(local,amount=5000,allocation_style='gradual',max_assets=2,min_ticket=500)
+        for row in local.data['assets']:
+            purchase=next(r for r in p['candidates'] if r['id']==row['id'])
+            row['value']+=purchase['amount'];row['position']['quantity']+=purchase['quantity']
+        local.data['allocation']=portfolio_strategy.allocation(local.data['assets'],local.data['fixed'],local.data['settings'],local.age)
+        next_plan=self.run_plan(local,amount=5000,allocation_style='gradual',max_assets=2,min_ticket=500)
+        self.assertEqual(next(r for r in next_plan['classes'] if r['key']=='rf')['budget'],5000)
+        self.assertEqual(next(r for r in next_plan['classes'] if r['key']=='national')['budget'],0)
+        self.assertEqual(next_plan['invested'],0)  # RF still requires choosing a product.
+
+    def test_minimum_ticket_prevents_tiny_purchases_and_zero_can_disable_it(self):
+        local=self.established_portfolio()
+        p=self.run_plan(local,amount=100,allocation_style='gradual',max_assets=2,min_ticket=500)
+        self.assertEqual(p['invested'],0);self.assertEqual(p['unassigned'],100)
+        p=self.run_plan(local,amount=100,allocation_style='gradual',max_assets=2,min_ticket=0)
+        self.assertEqual(p['invested'],100)
+
+    def test_comparisons_share_state_without_mutating_or_overallocating(self):
+        local=self.established_portfolio();before=copy.deepcopy(local.data)
+        p=self.run_plan(local,amount=5000,allocation_style='gradual',max_assets=2,min_ticket=500)
+        self.assertEqual(before,local.data)
+        for scenario in p['comparisons']:
+            self.assertLessEqual(len(scenario['destinations']),scenario['max_assets'])
+            self.assertEqual(scenario['invested']+scenario['unassigned'],5000)
 
 
 class LongTermIntegrationTests(unittest.TestCase):

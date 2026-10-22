@@ -107,3 +107,9 @@ Os testes usam carteiras temporárias e registros sintéticos. Recursos opcionai
 ## Recomendação do próximo aporte
 
 Em **Recomendar aporte**, informe dinheiro novo e escolha a versão base ou base + contexto. Usa carteira + ativos acompanhados e suas metas por classe, com qualidade documentada, referência de preço, margem de segurança e limites de concentração após as sugestões. Classes sem produto escolhido e valores sem oportunidade ficam a decidir. Consulte [o método e a pesquisa sobre qualidade e contrafluxo](LONGO_PRAZO.md).
+
+## ETFs por área e aportes com poucos destinos
+
+A plataforma identifica áreas publicadas dos ETFs e mostra onde já existe posição e onde há apenas acompanhamento. DEBB11 aparece como debêntures / crédito privado; ABTC11 combina Bitcoin e renda fixa com pesos variáveis, sem presumir exposição integral a Bitcoin. A categoria do produto para metas pode ser ajustada manualmente; essa escolha não cria pesos da composição.
+
+O recomendador inicia em **Poucos destinos**, até dois ativos, com mínimo por compra ajustável (inclusive zero). Compare um, dois, três destinos e a divisão proporcional. As metas por classe podem ficar temporariamente desequilibradas; limites por emissor e setor continuam obrigatórios. As classes abaixo da meta aparecem para revisão no próximo aporte, sem agendar compras ou prever preços. O método completo e as fontes estão em [LONGO_PRAZO.md](LONGO_PRAZO.md).
