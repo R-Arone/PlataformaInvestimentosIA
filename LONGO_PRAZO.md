@@ -1,6 +1,6 @@
 # Recomendador de aportes: qualidade, valor e contrafluxo
 
-A primeira versão trabalha somente com a carteira e os ativos acompanhados. Usa as metas salvas por classe; elas podem ser ajustadas em **Metas e aportes**. O cálculo é local, sem ordens, vendas, alteração de posições ou envio da carteira a modelos externos.
+O recomendador trabalha somente com a carteira e os ativos acompanhados. **Poucos destinos** e **Proporcional** usam as metas salvas por classe, ajustáveis em **Metas e aportes**. **Oportunidades de alta** ignora as metas e também funciona sem metas cadastradas. O cálculo é local, sem ordens, vendas, alteração de posições ou envio da carteira a modelos externos.
 
 ## Como a tese é usada
 
@@ -14,7 +14,7 @@ A [MSCI](https://www.msci.com/indexes/group/quality-indexes) usa rentabilidade d
 
 Também existe evidência de [valor e momentum usados em conjunto](https://www.aqr.com/insights/research/journal-article/value-and-momentum-everywhere). Retirar tendência do nosso ranking base é uma escolha de desenho para esta tese; não é uma conclusão de superioridade sobre estratégias que usam momentum.
 
-## Regras da primeira versão
+## Regras de qualidade e desconto (Poucos destinos e Proporcional)
 
 1. Escolher o estilo do aporte. **Proporcional** reparte pelos déficits positivos das classes e mantém os orçamentos por meta. **Poucos destinos** prioriza até dois ativos inicialmente, permitindo que uma classe fique temporariamente acima da meta. Só entram classes com orçamento positivo na referência proporcional; os limites por emissor e setor continuam obrigatórios. Os limites de destinos são ajustáveis de 1 a 20.
 2. Comparar ações brasileiras e FIIs, com cotação de até sete dias. As demais classes recebem orçamento, com produto ainda a escolher.
@@ -41,11 +41,37 @@ O [ABTC11](https://www.btgpactual.com/asset-management/etf/ABTC11) combina Bitco
 
 O mapa distingue posições atuais de ativos apenas acompanhados. Bitcoin direto e um ETF relacionado podem compartilhar uma área; fundos de crédito e ETFs de debêntures podem compartilhar crédito privado. A relação é temática, não uma demonstração de ativos idênticos ou uma soma de percentuais internos. A carteira do produto pode mudar; a fonte e a data devem ser conferidas. Temas podem ser editados com fonte e data, e ativos desconhecidos não são classificados por palavras do nome. Os registros ficam no banco privado e nos backups.
 
-## Versão com contexto
+## Oportunidades de alta: ignorar balanceamento
+
+Este estilo procura alta observada ou possível virada pelos modelos e permite investir em uma classe acima da meta ou com meta zero. O déficit de classe não entra na nota nem restringe o orçamento. Metas existentes são mostradas apenas para conferência do desequilíbrio; sem metas, a distância não é calculada. A comparação de um, dois ou três destinos mantém o mesmo estilo e a mesma escolha de IA.
+
+Ações brasileiras e FIIs mantêm cobertura mínima e os filtros documentados de qualidade. O descarte obrigatório de FII com P/VP conhecido acima de 1,5 permanece. Desconto, teto de avaliação, P/VP abaixo de 1 e yield dos pares passam a ser informações de preço, em vez de condições de entrada deste estilo. Portanto, ele pode sugerir algo acima do teto de avaliação: essa diferença da tese de valor é explícita.
+
+ETFs brasileiros com composição documentada, BDRs e Bitcoin também podem usar indicadores de mercado quando há cotação e histórico comparáveis em reais e setor classificado. Não recebem checklist de empresa nem previsões de IA que a plataforma não tenha produzido para esses produtos. A composição temática dos ETFs não demonstra todos os riscos internos. Produtos cotados em outra moeda e fundos sem série negociada não são cobertos. Quantidades continuam inteiras; produtos com unidade cara podem ficar sem compra sugerida.
+
+A leitura de mercado exige pelo menos 64 fechamentos ajustados e completos, com o último em até sete dias. Não usa o candle do dia ainda aberto ou coletado antes do encerramento. A nota combina 45% do retorno de 63 observações normalizado pela volatilidade, 35% da distância da média de 50 e 20% da proximidade do máximo das últimas 126 observações disponíveis. Retornos são calculados inteiramente na série ajustada, sem comparar seus preços com a cotação nominal. A volatilidade usa convenção de 252 observações para normalização, sem estimar risco anual futuro.
+
+Sem IA, exige retornos de 21 e 63 observações positivos e último fechamento acima da média de 50. Com IA válida, um escore médio abaixo de 40 bloqueia a sugestão neste estilo, e escore de pelo menos 60 pode permitir uma possível virada mesmo sem alta observada. Esses cortes e pesos são heurísticos e não foram validados como estratégia rentável. Os limites cadastrados por emissor/setor, o máximo de destinos, a cotação recente, o mínimo por compra e o universo escolhido continuam obrigatórios. Ignorar metas não desativa os limites de concentração.
+
+## Sem IA e com IA: diferença efetiva
+
+**Sem IA** usa exclusivamente as regras da estratégia escolhida. **Com IA** reutiliza os resultados de preços já calculados pela plataforma: modelos bayesiano, incremental e Chronos-2 quando disponíveis e válidos. A prioridade passa a ser **70% da nota sem IA + 30% da média dos escores válidos dos modelos**, tanto na tese de qualidade/desconto como no estilo de alta. Assim, a IA pode alterar notas, ordem e distribuição do dinheiro. Ela não supera bloqueios de qualidade ou concentração.
+
+O incremental fornece escore direcional de -100 a 100, convertido para 0 a 100. No bayesiano, o escore é 50 + (percentual de alta - percentual de queda) / 2. O Chronos-2 usa a mediana da previsão normalizada pela volatilidade observada no horizonte; exige intervalo ordenado e histórico válido para normalizar. Os escores são comparáveis apenas como regra do aplicativo, não como probabilidades calibradas. Modelos podem compartilhar preços e fatores; a média não representa votos independentes.
+
+Cada modelo precisa estar pronto, sem marca de desatualização, em BRL/mercado brasileiro, com referência e cálculo em até sete dias e sem datas futuras. É usado somente o horizonte selecionado: 1, 5 ou 20 pregões (inicialmente 20). A cobertura de IA de preços deste recomendador é de ações brasileiras. Modelos antigos, em aprendizado ou indisponíveis resultam em uso explícito da regra sem IA naquele ativo. Misturar cobertura parcial pode influenciar a ordem; o painel informa exatamente quais ativos receberam ajuste.
+
+**O que a IA mudou?** mostra notas, posições na lista e valores lado a lado, com e sem IA, mantendo carteira, preços, opções e limites idênticos. Mudanças de nota podem não alterar o dinheiro por causa dos limites, quantidades ou número de destinos; isso é informado. Sem modelos válidos, a tela avisa que o resultado é igual à versão sem IA. Não há alteração artificial para fazer as versões parecerem diferentes.
+
+**Atualizar IA local e recomendar** busca cinco anos de histórico público para até 40 ações brasileiras cadastradas, calcula os modelos bayesiano e incremental locais e recalcula a sugestão. Mostra progresso e preserva dados anteriores em falhas. Não envia posições, saldos ou operações aos provedores de preços. Esse botão não baixa o Chronos-2; resultados anteriores válidos dele podem ser usados, e a execução opcional está na tela de modelos. A cotação nominal é atualizada pelo fluxo de mercado da plataforma. Apenas **Gerar sugestões** não inicia consultas de rede ou treinamento.
+
+Os horizontes dos modelos são curtos: eles não projetam o retorno de manter o ativo por anos. O painel e os testes mostram a influência matemática dos modelos, sem comprovar sua utilidade financeira.
+
+## Notícias e contexto
 
 Acrescenta a leitura salva de juros, dólar, commodities, notícias e sentimento por IA quando disponível e recente. A identificação de pessimismo usa notícias de mercado/setor e distância de pelo menos 15% do máximo na série ajustada disponível. Exige pelo menos 120 observações, com última observação em até sete dias; mostra o intervalo efetivamente usado, sem apresentá-lo como um ano completo obrigatório.
 
-O marcador de 15% é editorial. A queda é calculada inteiramente na série ajustada, sem misturar seu máximo com a cotação nominal. O cenário explica possíveis canais de impacto e o que invalidaria a tese. Dados antigos ou ausentes são identificados. O contexto não altera silenciosamente o ranking nem o orçamento e não informa chance de alta ou retorno esperado. Gerar a recomendação não inicia análise paga nem envia dados a um modelo.
+O marcador de 15% é editorial. A queda é calculada inteiramente na série ajustada, sem misturar seu máximo com a cotação nominal. O cenário explica possíveis canais de impacto e o que invalidaria a tese. Dados antigos ou ausentes são identificados. Manchetes e sentimento não entram na nota; a influência dos modelos de preços é mostrada separadamente. Gerar a recomendação não inicia análise paga nem envia dados a um modelo externo.
 
 ## Validação de investimento ainda necessária
 

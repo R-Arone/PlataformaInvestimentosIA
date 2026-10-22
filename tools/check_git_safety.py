@@ -26,6 +26,7 @@ MODULES.add('company_batch.py')
 MODULES.add('company_quality.py')
 MODULES.add('fii_quality.py')
 MODULES.add('long_term.py')
+MODULES.add('recommendation_signals.py')
 ROOT_FILES.add('LONGO_PRAZO.md')
 
 # Ensaios dependentes de bases locais ou de ferramentas offline nao publicadas.

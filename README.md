@@ -106,7 +106,9 @@ Os testes usam carteiras temporárias e registros sintéticos. Recursos opcionai
 
 ## Recomendação do próximo aporte
 
-Em **Recomendar aporte**, informe dinheiro novo e escolha a versão base ou base + contexto. Usa carteira + ativos acompanhados e suas metas por classe, com qualidade documentada, referência de preço, margem de segurança e limites de concentração após as sugestões. Classes sem produto escolhido e valores sem oportunidade ficam a decidir. Consulte [o método e a pesquisa sobre qualidade e contrafluxo](LONGO_PRAZO.md).
+Em **Recomendar aporte**, informe dinheiro novo e escolha entre qualidade/desconto pelas metas e **Oportunidades de alta · ignorar balanceamento**. O segundo estilo prioriza sinais de mercado mesmo em classes acima da meta e funciona sem metas cadastradas. Usa carteira + ativos acompanhados; os limites por emissor/setor e os filtros documentados de qualidade de ações/FIIs continuam valendo.
+
+Escolha **Sem IA** ou **Com IA**. Com modelos locais válidos, a IA passa a influenciar a nota, a ordem e os valores sugeridos; **O que a IA mudou?** compara o resultado com e sem os modelos. **Atualizar IA local e recomendar** busca histórico público e calcula os modelos locais de preços para ações brasileiras, com progresso. Sem modelos válidos, a tela informa que usou apenas as regras sem IA. ETFs, FIIs, BDRs e Bitcoin podem usar indicadores de mercado no modo de alta, sem receber previsões de empresa inventadas. Os modelos de 1, 5 ou 20 pregões são experimentais e não projetam o retorno de vários anos. Consulte [método, fontes e limites](LONGO_PRAZO.md).
 
 ## ETFs por área e aportes com poucos destinos
 
