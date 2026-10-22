@@ -42,6 +42,7 @@ import fii_research
 import international_market
 import history_cache
 import portfolio_strategy
+import long_term
 import holdings
 import portfolio_coupling
 import market_signals
@@ -1764,6 +1765,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/fii-research.js': ('fii-research.js', 'application/javascript'),
                  '/intelligence.js': ('intelligence.js', 'application/javascript'),
                  '/tesouro.js': ('tesouro.js', 'application/javascript'),
+                 '/long-term.js': ('long-term.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),
@@ -1885,6 +1887,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(b3_import.preview(__import__(__name__), d))
             if path == '/api/signals/analyze':return self.respond(market_signals.start(__import__(__name__),d))
             if path == '/api/allocation/plan':return self.respond(portfolio_strategy.plan(__import__(__name__),d))
+            if path == '/api/allocation/recommend':return self.respond(long_term.recommend(__import__(__name__),d))
             if path == '/api/history/fetch':return self.respond(history_cache.fetch(__import__(__name__),d))
             if path == '/api/b3/commit':
                 import b3_import

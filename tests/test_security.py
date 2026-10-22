@@ -150,7 +150,7 @@ class ProtectedAppTests(unittest.TestCase):
         self.assertEqual(self.request('/api/settings',{'profile':'test'},self.token,origin='https://example.org')[0],403)
         self.assertEqual(self.request('/api/ai/models',{})[0],401)
         for path in ('/api/ai/import','/api/ai/import/commit','/api/ai/import/discard','/api/ai/exposure','/api/ai/instrument-quotes',
-                     '/api/issuer/analyze','/api/issuer/report','/api/issuer/financials','/api/issuer/auto','/api/issuer/quality-facts','/api/fii/quality-facts'):
+                     '/api/issuer/analyze','/api/issuer/report','/api/issuer/financials','/api/issuer/auto','/api/issuer/quality-facts','/api/fii/quality-facts','/api/allocation/recommend'):
             self.assertEqual(self.request(path,{})[0],401)
             self.assertEqual(self.request(path,{},self.token,csrf=False)[0],403)
         self.assertEqual(self.request('/api/ai/scenario',{'question':'Cenário público'},self.token,csrf=False)[0],403)

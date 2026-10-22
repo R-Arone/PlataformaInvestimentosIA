@@ -25,6 +25,8 @@ MODULES.add('company_evidence.py')
 MODULES.add('company_batch.py')
 MODULES.add('company_quality.py')
 MODULES.add('fii_quality.py')
+MODULES.add('long_term.py')
+ROOT_FILES.add('LONGO_PRAZO.md')
 
 # Ensaios dependentes de bases locais ou de ferramentas offline nao publicadas.
 LOCAL_TESTS={'test_installer.py','test_model_comparison.py','test_company_history.py',

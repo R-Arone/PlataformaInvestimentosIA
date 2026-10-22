@@ -103,3 +103,7 @@ Não adicione dados reais ao código, aos testes, aos commits ou às issues. A r
 ```
 
 Os testes usam carteiras temporárias e registros sintéticos. Recursos opcionais de IA podem exigir suas dependências para testes específicos. Arquivos temporários e registros dos testes não fazem parte do repositório.
+
+## Recomendação do próximo aporte
+
+Em **Recomendar aporte**, informe dinheiro novo e escolha a versão base ou base + contexto. Usa carteira + ativos acompanhados e suas metas por classe, com qualidade documentada, referência de preço, margem de segurança e limites de concentração após as sugestões. Classes sem produto escolhido e valores sem oportunidade ficam a decidir. Consulte [o método e a pesquisa sobre qualidade e contrafluxo](LONGO_PRAZO.md).
