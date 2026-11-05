@@ -116,6 +116,8 @@ class CriteriaTests(unittest.TestCase):
         self.asset['snapshots']['issuer_governance']={'data':{'first_listed':'1900-01-01'}}
         self.assertEqual(self.status('age30'),'unknown')
         with patch.object(app,'today',return_value=date(2026,10,21)):
+            # Evidence and anniversary must use the same frozen clock.
+            for row in self.payload['facts'].values():row['asof']=app.today().isoformat()
             self.fact('founded','1996-10-21')
             self.assertEqual(self.status('age30'),'fail')
             self.fact('founded','1996-10-20')

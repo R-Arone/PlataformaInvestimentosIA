@@ -6,6 +6,7 @@ import fii_quality
 import portfolio_strategy
 import investment_exposure
 import recommendation_signals
+import contrarian
 
 
 REFERENCES = [
@@ -48,7 +49,7 @@ def options(app, data):
     if mode not in ('base', 'context') or universe not in ('all', 'held'):
         raise ValueError('Escolha a versão e a lista de ativos.')
     style=data.get('allocation_style','gradual')
-    if style not in ('gradual','balanced','opportunities'):raise ValueError('Escolha poucos destinos, proporcional ou oportunidades de alta.')
+    if style not in ('gradual','balanced','opportunities','contrarian'):raise ValueError('Escolha contrafluxo, poucos destinos, proporcional ou oportunidades de alta.')
     horizon=data.get('signal_horizon',20)
     if isinstance(horizon,bool) or str(horizon) not in ('1','5','20'):raise ValueError('Escolha um horizonte de 1, 5 ou 20 pregões para os modelos.')
     limit = data.get('max_assets', 2)
@@ -145,7 +146,7 @@ def context(app, asset, eligible):
                and r.get('observation') and recent(app, r['observation'].get('asof'), 45)]
     pessimism = any(s['tone'] == 'negative' for s in sentiments)
     fallen = drawdown is not None and drawdown['value'] <= -15
-    hypothesis = ('Candidato a estudo de contrafluxo: qualidade e desconto passaram; há queda de pelo menos 15% '
+    hypothesis = ('Candidato a estudo de contrafluxo: os filtros deste cenário passaram; há queda de pelo menos 15% '
                   'na série ajustada disponível ou cobertura negativa de mercado/setor. Investigue se o problema é temporário.'
                   if eligible and (fallen or pessimism) else
                   'Preço ou cobertura desfavorável não compensa as pendências da tese. Resolva os bloqueios primeiro.'
@@ -174,18 +175,23 @@ def candidate(app, asset, state, opts, budgets):
     quality = counts['pass']/total*100 if total else None
     price = price_reference(app, asset, state)
     opportunity=opts['allocation_style']=='opportunities'
+    contra=opts['allocation_style']=='contrarian'
     fundamental=asset.get('asset_type') in ('stock','fii')
+    broad_etf=contra and asset.get('asset_type')=='etf' and contrarian.exposure(asset,app) is not None
     # In momentum mode valuation is information, not an entry ceiling. Quotes
     # and the user's mandatory FII discard remain hard gates.
     reasons = ([x for x in price['issues'] if x.startswith(('Cotação ausente','Descarte obrigatório'))]
                if opportunity else list(price['issues']))
     price_warnings=[x for x in price['issues'] if x not in reasons] if opportunity else []
-    if opportunity and not fundamental:
-        price_warnings=[]
+    if broad_etf:
+        reasons=[x for x in price['issues'] if x.startswith('Cotação ausente')]
+        price_warnings=['ETF amplo: sem valor justo de empresa. Confira índice, custos, liquidez e composição antes de executar.']
+    if opportunity and not fundamental or broad_etf:
+        if opportunity:price_warnings=[]
         quality=None;coverage=0;counts={s:0 for s in counts};total=0;checks=[]
-    if not fundamental and not opportunity:
+    if not fundamental and not opportunity and not broad_etf:
         reasons.append('Produto a escolher na análise própria da classe.')
-    if (fundamental or not opportunity) and (not total or coverage+1e-8 < opts['min_coverage']):
+    if not broad_etf and (fundamental or not opportunity) and (not total or coverage+1e-8 < opts['min_coverage']):
         reasons.append('Cobertura dos critérios abaixo do mínimo de '+format(opts['min_coverage'], 'g')+'%.')
     fails = [c['label'] for c in checks if c['status'] == 'fail']
     if fails: reasons.append('Critérios de qualidade a revisar: '+ '; '.join(fails))
@@ -193,7 +199,7 @@ def candidate(app, asset, state, opts, budgets):
                     if c.get('key') == 'fii_quality_yield']
     if not opportunity and any(c['status'] == 'fail' for c in price_checks):
         reasons.append('Yield abaixo da média documentada dos FIIs comparáveis.')
-    if not opportunity and not budgets.get(cls): reasons.append('Classe adiada neste cenário de poucos destinos; confira a próxima prioridade.' if opts.get('allocation_style')=='gradual' and class_row['target']>class_row['weight'] else 'Classe sem orçamento neste cenário segundo suas metas.')
+    if not opportunity and not contra and not budgets.get(cls): reasons.append('Classe adiada neste cenário de poucos destinos; confira a próxima prioridade.' if opts.get('allocation_style')=='gradual' and class_row['target']>class_row['weight'] else 'Classe sem orçamento neste cenário segundo suas metas.')
     if opts['universe'] == 'held' and not item['held']: reasons.append('Ativo fora da carteira; filtro selecionado: somente posições atuais.')
     if sector(asset) == 'não classificado': reasons.append('Classifique o setor antes de aplicar limites de concentração.')
     target = (class_row['target'] or 0)/100*(allocation['total']+opts['amount'])
@@ -201,7 +207,16 @@ def candidate(app, asset, state, opts, budgets):
     need = min(100, deficit/target*100) if target and not opportunity else 0
     discount = min(100, max(0, price.get('discount') or 0)/30*100)
     priority = round(.5*quality+.35*discount+.15*need, 2) if quality is not None else None
-    observed=recommendation_signals.market(app,asset) if opportunity or opts['mode']=='context' else None
+    observed=recommendation_signals.market(app,asset) if opportunity or contra or opts['mode']=='context' else None
+    contraflow=contrarian.candidate(app,asset,state,observed) if contra else None
+    if contra:
+        if not contraflow['active']:reasons.append('Contrafluxo sem queda relevante confirmada; acompanhar em vez de forçar compra.')
+        if broad_etf:
+            quality=None;coverage=0;counts={s:0 for s in counts};fails=[];checks=[];price_checks=[]
+            priority=round(.7*contraflow['score']+.3*need,4)
+            if not observed['available']:reasons.append(observed['reason'])
+        elif fundamental and quality is not None:
+            priority=round(.4*quality+.3*discount+.2*contraflow['score']+.1*need,4)
     if opportunity:
         priority=observed['score']
         if not observed['available']:reasons.append(observed['reason'])
@@ -222,9 +237,10 @@ def candidate(app, asset, state, opts, budgets):
                 quality=round(quality, 2) if quality is not None else None, coverage=round(coverage, 2),
                 counts=counts, failures=fails, pending=[c['label'] for c in checks+price_checks if c['status']=='unknown'],
                 previous_score=asset.get('analysis', {}).get('score'), priority=priority,
-                components=dict(quality=quality, discount=discount, rebalance=need), price=price,
+                components=dict(quality=quality, discount=discount, rebalance=need,contraflow=contraflow['score'] if contra else None), price=price,
                 market_signal=observed,ai=model,price_warnings=price_warnings,
-                strategy='opportunities' if opportunity else 'quality_value',
+                contraflow=contraflow,
+                strategy='contrarian' if contra else 'opportunities' if opportunity else 'quality_value',
                 eligible=not reasons, reasons=list(dict.fromkeys(reasons)), amount=0, quantity=0)
 
 
@@ -291,11 +307,12 @@ def suggestion(app, state, opts):
     allocation=state['allocation']
     cents = money_cents(opts['amount'])
     opportunity=opts['allocation_style']=='opportunities'
+    flexible=opts['allocation_style'] in ('opportunities','contrarian')
     ideal={key:0 for key in portfolio_strategy.CLASSES}
     if allocation['has_targets']:
         _, ideal, _ = portfolio_strategy.distribution(allocation, {}, cents, app.number)
     order=lambda r:(not r['eligible'], -(r['priority'] if r['priority'] is not None else -1), r['ticker'])
-    seed=sorted((candidate(app,a,state,{**opts,'allocation_style':'opportunities' if opportunity else 'balanced'},ideal) for a in state['assets']),key=order)
+    seed=sorted((candidate(app,a,state,{**opts,'allocation_style':opts['allocation_style'] if flexible else 'balanced'},ideal) for a in state['assets']),key=order)
     selected=[];issuers=set()
     for row in seed:
         if not row['eligible'] or row['issuer'] in issuers:continue
@@ -303,7 +320,7 @@ def suggestion(app, state, opts):
         if len(selected)>=opts['max_assets']:break
     selected=list(dict.fromkeys(selected))
     gradual=opts['allocation_style']=='gradual' and bool(selected)
-    budgets=({key:cents for key in ideal} if opportunity else
+    budgets=({key:cents for key in ideal} if flexible else
              {key:cents if key in selected else 0 for key in ideal} if gradual else dict(ideal))
     rows=sorted((candidate(app,a,state,opts,budgets) for a in state['assets']),key=order)
     stable = allocate(state, rows, budgets, opts['max_assets'],opts['min_ticket'],cents)
@@ -311,7 +328,7 @@ def suggestion(app, state, opts):
         lookup = {a['id']:a for a in state['assets']}
         for row in rows: row['context'] = context(app, lookup[row['id']], row['eligible'])
     spent = sum(money_cents(r['amount']) for r in rows)
-    if gradual or opportunity:
+    if gradual or flexible:
         budgets={key:sum(money_cents(r['amount']) for r in rows if r['class_key']==key) for key in ideal}
         budgets[selected[0] if selected else 'other']+=cents-spent
     final_total = allocation['total']+opts['amount']
@@ -328,6 +345,7 @@ def suggestion(app, state, opts):
     if not stable: warnings.append('Não foi possível estabilizar os limites de concentração; nenhum valor foi destinado.')
     if opts['allocation_style']=='gradual':warnings.append('Poucos destinos: as metas por classe orientam a prioridade, mas podem ficar temporariamente desequilibradas. Os limites por emissor e setor continuam obrigatórios.')
     if opportunity:warnings.append('Oportunidades de alta: metas por classe e desconto não determinam a ordem nem o orçamento. Pode aumentar o desequilíbrio. Qualidade de ações/FIIs, descarte obrigatório de FII e limites de concentração continuam sendo verificados.')
+    if opts['allocation_style']=='contrarian':warnings.append('Contrafluxo: quedas só orientam estudo de aporte quando os filtros do produto passam. Metas são referência na nota, sem orçamento obrigatório por classe. O sinal não prevê o fundo nem garante recuperação; limites de concentração continuam obrigatórios.')
     if opts['mode']=='context':
         applied=sum(r['ai']['applied'] for r in rows)
         warnings.append(f'IA aplicada à nota de {applied} de {len(rows)} ativos avaliados. Nos demais, a nota usa apenas as regras sem IA; confira os motivos individuais.')
@@ -342,7 +360,7 @@ def suggestion(app, state, opts):
                 next_classes=[dict(key=r['key'],label=r['label'],gap=max(0,r['target']/100*final_total-r['value']-r['suggested'])) for r in classes if r['target'] is not None and r['after_weight']<r['target']-.01],
                 unassigned_weight=(cents-spent)/100/final_total*100, candidates=rows, classes=classes,
                 warnings=warnings, references=REFERENCES,
-                method=(recommendation_signals.METHOD if opportunity else METHOD+(' Com IA válida: 70% desta nota + 30% da média dos escores dos modelos locais no horizonte escolhido. Pesos experimentais.' if opts['mode']=='context' else '')),
+                method=(contrarian.METHOD if opts['allocation_style']=='contrarian' else recommendation_signals.METHOD if opportunity else METHOD+(' Com IA válida: 70% desta nota + 30% da média dos escores dos modelos locais no horizonte escolhido. Pesos experimentais.' if opts['mode']=='context' else '')),
                 generated_at=app.now(),
                 limits=dict(asset=state['settings']['asset_limit'], sector=state['settings']['sector_limit'],
                             scope='Emissores e setores dentro da carteira negociada efetivamente investida; ON/PN/units compartilham o limite.'),
@@ -373,13 +391,15 @@ def ai_comparison(result, baseline):
 
 def recommend(app, data):
     opts=options(app,data);state=app.state();allocation=state['allocation']
-    if not allocation['has_targets'] and opts['allocation_style']!='opportunities':raise ValueError('Salve suas metas em Metas e aportes ou selecione Oportunidades de alta para ignorar metas.')
+    if not allocation['has_targets'] and opts['allocation_style'] not in ('opportunities','contrarian'):raise ValueError('Salve suas metas ou selecione Contrafluxo ou Oportunidades de alta para usar metas apenas como referência.')
     if allocation['issues'] and not opts['accept_estimates']:
         raise ValueError('Atualize os saldos e classificações ou confirme o uso das estimativas da carteira.')
     result=suggestion(app,state,opts)
     result['exposure_areas']=state.get('exposure_areas',[])
+    result['market_context']=state.get('contribution_context',contrarian.public_state(app,{}))
+    result['market_ideas']=contrarian.ideas(app,state,result['candidates'],opts['universe'])
     result['comparisons']=[]
-    style='opportunities' if opts['allocation_style']=='opportunities' else 'gradual'
+    style=opts['allocation_style'] if opts['allocation_style'] in ('opportunities','contrarian') else 'gradual'
     scenarios=[(style,1,'Um destino agora'),(style,2,'Até dois destinos'),(style,3,'Até três destinos')]
     if allocation['has_targets']:scenarios.append(('balanced',20,'Distribuição proporcional'))
     for style,limit,label in scenarios:

@@ -43,6 +43,7 @@ import international_market
 import history_cache
 import portfolio_strategy
 import long_term
+import contrarian
 import holdings
 import portfolio_coupling
 import market_signals
@@ -493,6 +494,7 @@ def state():
                 a['fii_research']['news_context']=company_research.company_history.company_insights.news_context(
                     sys.modules[__name__],a,news_feeds,ai_state['sentiment'])
         return {'assets': assets,
+                'contribution_context':contrarian.public_state(sys.modules[__name__],read_cache(c,contrarian.CACHE,{})),
                 'exposure_areas':investment_exposure.areas(assets,fixed,saved_exposures,age),
                 'exposure_themes':investment_exposure.THEMES,
                 'issuer_auto':read_cache(c,'issuer_auto',True),
@@ -1895,6 +1897,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/signals/analyze':return self.respond(market_signals.start(__import__(__name__),d))
             if path == '/api/allocation/plan':return self.respond(portfolio_strategy.plan(__import__(__name__),d))
             if path == '/api/allocation/recommend':return self.respond(long_term.recommend(__import__(__name__),d))
+            if path == '/api/allocation/context':return self.respond(contrarian.refresh(__import__(__name__),d))
             if path == '/api/history/fetch':return self.respond(history_cache.fetch(__import__(__name__),d))
             if path == '/api/b3/commit':
                 import b3_import
