@@ -1775,6 +1775,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/intelligence.js': ('intelligence.js', 'application/javascript'),
                  '/tesouro.js': ('tesouro.js', 'application/javascript'),
                  '/long-term.js': ('long-term.js', 'application/javascript'),
+                 '/navigation.js': ('navigation.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),

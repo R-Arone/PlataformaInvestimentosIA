@@ -121,3 +121,18 @@ O painel separa ideias de mercado, produtos aprovados nos filtros e valores efet
 A plataforma identifica áreas publicadas dos ETFs e mostra onde já existe posição e onde há apenas acompanhamento. DEBB11 aparece como debêntures / crédito privado; ABTC11 combina Bitcoin e renda fixa com pesos variáveis, sem presumir exposição integral a Bitcoin. A categoria do produto para metas pode ser ajustada manualmente; essa escolha não cria pesos da composição.
 
 A tela inicia em **Contrafluxo**, com até dois destinos e mínimo por compra ajustável (inclusive zero). **Poucos destinos** continua disponível para qualidade/desconto pelas metas. Compare um, dois, três destinos e a divisão proporcional. As metas por classe podem ficar temporariamente desequilibradas; limites por emissor e setor continuam obrigatórios. As classes abaixo da meta aparecem para revisão no próximo aporte, sem agendar compras ou prever preços. O método completo e as fontes estão em [LONGO_PRAZO.md](LONGO_PRAZO.md).
+
+## Navegação por tarefa
+
+O menu principal reúne seis áreas:
+
+- **Início:** resumo do patrimônio e atalhos para o próximo passo.
+- **Carteira:** posições, operações e proventos; diversificação fica em detalhes.
+- **Analisar ativos:** uma lista de ações, FIIs, ETFs, Bitcoin e exterior, com filtros e uma análise por ativo. O comparador mostra os mesmos dados lado a lado, sem outro ranking de aporte.
+- **Aportar:** um único fluxo para sugerir dinheiro novo. Metas e limites são configuração; destinos, critérios e comparação de divisões ficam em opções recolhidas. Simuladores continuam acessíveis nesta área.
+- **Mercado:** notícias e contexto; modelos de IA, cenários, pesquisa externa e alertas são ferramentas complementares.
+- **Configurações:** preferências, backup, importação, fontes e restauração de registros removidos.
+
+Os antigos links de stocks dos EUA e de outras bolsas levam à mesma lista filtrada. Os demais links especializados continuam funcionando dentro da área correspondente. A organização da interface não altera posições, operações, indicadores salvos, critérios ou cálculos do recomendador.
+
+Na barra superior, **Bloquear carteira** continua disponível diretamente. **Reiniciar aplicativo** e **Encerrar aplicativo** ficam no menu **Aplicativo**. Na sugestão de aporte, controles de modelos aparecem junto da opção Com IA; demais ajustes ficam recolhidos.
