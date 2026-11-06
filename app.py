@@ -45,6 +45,7 @@ import portfolio_strategy
 import long_term
 import investment_value
 import investment_risk
+import portfolio_review
 import contrarian
 import holdings
 import portfolio_coupling
@@ -502,6 +503,7 @@ def state():
                 a['fii_research']['news_context']=company_research.company_history.company_insights.news_context(
                     sys.modules[__name__],a,news_feeds,ai_state['sentiment'])
         return {'assets': assets,
+                'position_review':portfolio_review.evaluate(sys.modules[__name__],assets,public_cfg,read_cache(c,'valuation_cases',{}),read_cache(c,portfolio_review.CACHE,{})),
                 'contribution_context':contrarian.public_state(sys.modules[__name__],read_cache(c,contrarian.CACHE,{})),
                 'market_research':read_cache(c,'market_batch',None),
                 'exposure_areas':investment_exposure.areas(assets,fixed,saved_exposures,age),
@@ -1791,6 +1793,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/research-dashboard.js': ('research-dashboard.js', 'application/javascript'),
                  '/accessibility.js': ('accessibility.js', 'application/javascript'),
                  '/completion.js': ('completion.js', 'application/javascript'),
+                 '/aporte-cards.js': ('aporte-cards.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),
@@ -1870,6 +1873,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'ok':True})
             if path == '/api/refresh':
                 return self.respond(start_refresh(int(d['asset_id']) if d.get('asset_id') else None))
+            if path=='/api/positions/review':return self.respond(portfolio_review.record(sys.modules[__name__],d))
             if path.startswith('/api/monitor/'):
                 return self.respond(market_monitor.action(sys.modules[__name__],path,d))
             if path=='/api/benchmarks/update': return self.respond(brazil_benchmarks())

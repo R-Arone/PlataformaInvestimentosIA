@@ -161,3 +161,9 @@ Em **Configurações → Cores e acessibilidade**, ative o modo daltônico: cian
 Use **Completar dados das empresas** na lista ou **Completar dados faltantes** no checklist. O fluxo consulta os históricos públicos e pode pesquisar os campos restantes com IA local e busca configurada. Propostas têm trecho, fonte e período; podem ser editadas e revisadas em lote antes de entrar nos critérios. A marca **✦ Pesquisa IA** distingue origem revisada e alterações suas. Registros manuais são preservados e fontes indisponíveis continuam sinalizadas.
 
 A nota de qualidade agora mostra o resultado dos critérios conhecidos junto da cobertura: sem dados e critério negativo são situações diferentes. A prioridade de aporte mantém a base conservadora e os bloqueios. Nos fatores associados, positivo/negativo têm cores próprias; ausência de evidência fica neutra. O modo daltônico usa **ciano e roxo**, incluindo gráficos e correlações. Veja [método, fontes e limitações](LONGO_PRAZO.md).
+
+## Aporte explicado e posições para revisar
+
+Os cartões de Aportar ficam compactos, com quatro áreas clicáveis: queda, preço/valor, qualidade e setor/carteira. Os detalhes mostram indicadores, fórmula, premissas, fontes, dados faltantes e critérios individuais. **Investidor10** abre diretamente a página da ação, FII ou ETF brasileiro. Queda e valor fundamental são avaliados separadamente; falta de referência continua explícita.
+
+Em **Início** e **Carteira**, **Posições para revisar** reúne reprovações atuais, critérios perdidos desde o início do acompanhamento local e alertas de preço pelas premissas salvas. Mudança de regra e falta de dados têm tratamentos distintos. Preço muito acima dos modelos exige ao menos duas famílias aplicáveis com entradas conferíveis; bases limitadas ficam identificadas. FIIs preservam a regra própria de P/VP acima de 1,5. O painel ajuda a revisar manutenção ou redução, sem executar vendas. Veja [regras e limites](LONGO_PRAZO.md).

@@ -140,6 +140,7 @@ def profile(a):
     if any(x in sector for x in ('varej','comercio','vestuario','calcado')): return 'retail'
     if any(x in sector for x in ('miner','sider','metal','aco')): return 'metals'
     if any(x in sector for x in ('petroleo','celulose','alcool','acucar')): return 'commodity'
+    if any(x in sector for x in ('software','programas e servicos','servicos de ti','processamento de dados')):return 'technology'
     for ident,words in [('construction',('construcao','incorpor','imoveis')),('transport',('transporte','logistica','aluguel de carros','ferrovia','rodovia')),('telecom',('telecom','comunicac')),('technology',('tecnolog','software')),('health',('saude','hospital','farmac','diagnostic')),('education',('educacao','educacion','ensino')),('food_agro',('agro','alimento','carne','laticinio')),('industrial',('industr','maquina','equipament','material','embala'))]:
         if any(word in sector for word in words): return ident
     return 'general'

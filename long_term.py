@@ -10,6 +10,7 @@ import contrarian
 import market_research
 import investment_value
 import investment_risk
+import investment_decision
 
 
 REFERENCES = [
@@ -390,4 +391,6 @@ def recommend(app, data):
             destinations=[dict(id=r['id'],ticker=r['ticker'],amount=r['amount'],quantity=r['quantity']) for r in scenario['candidates'] if r['amount']]))
     baseline=suggestion(app,state,{**opts,'mode':'base'},risk) if opts['mode']=='context' else result
     result['ai_effect']=ai_comparison(result,baseline)
+    assets={a['id']:a for a in state['assets']}
+    for row in result['candidates']:row['decision_evidence']=investment_decision.explain(app,assets[row['id']],row,state)
     return result
