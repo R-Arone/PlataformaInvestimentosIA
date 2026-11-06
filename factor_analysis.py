@@ -13,6 +13,7 @@ import hashlib
 import json
 import re
 import statistics
+from functools import lru_cache
 import urllib.parse
 from html.parser import HTMLParser
 from concurrent.futures import ThreadPoolExecutor
@@ -433,7 +434,7 @@ def inverse(matrix):
     return [r[n:] for r in work]
 
 
-def fit(panel, uncertainty=True, family=6):
+def fit(panel, uncertainty=True, family=6, autoregressive=False):
     """Standardized OLS on factor and index, retaining physical-unit slope."""
     y,x,m = ([r[k] for r in panel] for k in ('y','x','m'))
     scales = [statistics.pstdev(v) for v in (y,x,m)]
@@ -441,25 +442,31 @@ def fit(panel, uncertainty=True, family=6):
         return None
     ys, xs, ms = ([ (v-mean)/sd for v in vals] for vals,sd,mean in zip((y,x,m),scales,map(statistics.mean,(y,x,m))))
     design = [[1.,a,b] for a,b in zip(xs,ms)]
-    bread = inverse([[sum(r[i]*r[j] for r in design) for j in range(3)] for i in range(3)])
+    if autoregressive:
+        previous=[r['previous'] for r in panel];sd=statistics.pstdev(previous)
+        if sd<1e-10:return None
+        mean=statistics.mean(previous)
+        for row,value in zip(design,previous):row.append((value-mean)/sd)
+    width=len(design[0])
+    bread = inverse([[sum(r[i]*r[j] for r in design) for j in range(width)] for i in range(width)])
     if bread is None:
         return None
-    rhs = [sum(r[i]*v for r,v in zip(design,ys)) for i in range(3)]
-    b = [sum(row[j]*rhs[j] for j in range(3)) for row in bread]
+    rhs = [sum(r[i]*v for r,v in zip(design,ys)) for i in range(width)]
+    b = [sum(row[j]*rhs[j] for j in range(width)) for row in bread]
     result = dict(beta=b[1], slope=b[1]*scales[0]/scales[1])
     if not uncertainty:
         return result
     errors = [v-sum(a*c for a,c in zip(r,b)) for r,v in zip(design,ys)]
     scores = [[e*v for v in r] for r,e in zip(design,errors)]
-    meat = [[sum(r[i]*r[j] for r in scores) for j in range(3)] for i in range(3)]
+    meat = [[sum(r[i]*r[j] for r in scores) for j in range(width)] for i in range(width)]
     lookup = {month_number(r['month']):s for r,s in zip(panel,scores)}
     for lag in range(1,HAC_LAGS+1):
         pairs = [(s,lookup[t-lag]) for t,s in lookup.items() if t-lag in lookup]
         weight = 1-lag/(HAC_LAGS+1)
-        for i in range(3):
-            for j in range(3):
+        for i in range(width):
+            for j in range(width):
                 meat[i][j] += weight*sum(a[i]*c[j]+c[i]*a[j] for a,c in pairs)
-    variance = sum(bread[1][i]*meat[i][j]*bread[j][1] for i in range(3) for j in range(3))*len(panel)/(len(panel)-3)
+    variance = sum(bread[1][i]*meat[i][j]*bread[j][1] for i in range(width) for j in range(width))*len(panel)/(len(panel)-width)
     se = math.sqrt(max(0.,variance))
     # Fixed catalogue, including missing/unselected factors; hiding rows does not
     # make the evidence threshold less strict.
@@ -514,6 +521,54 @@ def saved(a):
     return data if data.get('market') == market(a) and data.get('symbol') == company_history.symbol(a) else {}
 
 
+LAGS=(0,1,3,6,12)
+
+
+def lagged_analysis(prices,benchmark,factors,mk,day,selected):
+    # Inputs are public historical changes, without positions, trades or notes.
+    payload=json.dumps([prices,benchmark,{k:factors[k] for k in selected if k in factors}],sort_keys=True)
+    return json.loads(_lagged_cached(payload,mk,day.isoformat(),tuple(sorted(selected))))
+
+
+@lru_cache(maxsize=128)
+def _lagged_cached(payload,mk,stamp,selected):
+    prices,benchmark,factors=json.loads(payload);day=date.fromisoformat(stamp)
+    y={month_number(k):v for k,v in prices.items() if month_number(k)<month_number(stamp)}
+    m={month_number(k):v for k,v in benchmark.items() if month_number(k)<month_number(stamp)}
+    family=len(MARKETS[mk]['factors'])*len(LAGS);result=[]
+    for key in selected:
+        meta=FACTORS[key];source=factors.get(key,{});base_lag=meta.get('lag',0)
+        x={month_number(k):v for k,v in changes(source.get('points',[]),meta['rate']).items() if month_number(k)<month_number(stamp)}
+        models=[]
+        for lag in LAGS:
+            total_lag=base_lag+lag
+            times=sorted(t for t in y if t in m and t-1 in y and t-total_lag in x)
+            panel=[dict(month=f'{t//12:04d}-{t%12+1:02d}',y=y[t],m=m[t],previous=y[t-1],x=x[t-total_lag]) for t in times]
+            row=dict(lag_months=total_lag,additional_lag=lag,n=len(panel),status='insufficient',beta=None,interval=None,
+                     start=panel[0]['month'] if panel else None,end=panel[-1]['month'] if panel else None,groups=[])
+            band=.1 if meta['rate'] else 1.
+            for sign,label in ((1,'Fator em subida'),(-1,'Fator em queda'),(0,'Fator estável')):
+                sample=[r for r in panel if (1 if r['x']>=band else -1 if r['x']<=-band else 0)==sign]
+                row['groups'].append(dict(direction=sign,label=label,n=len(sample),sufficient=len(sample)>=6,
+                    median_return=statistics.median(100*math.expm1(r['y']/100) for r in sample) if len(sample)>=6 else None,
+                    median_excess=statistics.median(100*(math.expm1(r['y']/100)-math.expm1(r['m']/100)) for r in sample) if len(sample)>=6 else None))
+            if len(panel)>=MIN_MONTHS:
+                estimated=fit(panel,family=family,autoregressive=True)
+                if estimated:
+                    halves=[fit(part,False,autoregressive=True) for part in (panel[:len(panel)//2],panel[len(panel)//2:])]
+                    low,high=estimated['interval'];direction=1 if low>0 else -1 if high<0 else 0
+                    stable=direction and all(h and h['beta']*direction>0 for h in halves)
+                    row.update(beta=estimated['beta'],interval=estimated['interval'],status=('positive' if direction>0 else 'negative') if stable else 'unstable' if direction else 'inconclusive')
+                else:row['status']='inconclusive'
+                if month_number(stamp)-times[-1]>3:row['status']='stale'
+            models.append(row)
+        result.append(dict(key=key,label=meta['label'],models=models,source_url=source.get('source_url'),family_size=family))
+    return json.dumps(dict(factors=result,lags=list(LAGS),family_size=family,
+        method='Atrasos adicionais fixos de 0, 1, 3, 6 e 12 meses. Retorno mensal da ação, controlado pelo índice no mesmo mês e pelo retorno da ação no mês anterior. Juros em variação de pontos percentuais; preços em retornos logarítmicos. Intervalos HAC e correção para todo o catálogo × cinco atrasos, inclusive fatores ausentes. Exige 36 meses e sinal estável nas duas metades. Não procura o melhor atraso.',
+        note='Relações históricas, sem causalidade ou previsão. A tabela de subida/queda é descritiva e exige seis observações por grupo; não remove outros choques. Mostra retorno mensal após o atraso, não retorno acumulado até esse mês. Dados revisados e datas de publicação impedem interpretar isto como backtest disponível à época. Preços podem antecipar decisões de juros.',
+        references=[dict(title='FPP3 · preditores defasados',url='https://otexts.com/fpp3/lagged-predictors.html'),dict(title='BCE · transmissão monetária e expectativas',url='https://www.ecb.europa.eu/mopo/intro/transmission/html/index.en.html')] ))
+
+
 def group(a):
     return (market(a),sector_analysis.fold(a.get('sector','')))
 
@@ -559,7 +614,7 @@ def enrich(app, assets):
             if row['status'] in ('positive','negative') and other.get('status') in ('positive','negative') and row['status']!=other['status']:
                 row.update(status='unstable',reason='A janela longa e os últimos cinco anos indicam sinais opostos; selo suspenso.')
         a['company_research']['factor_analysis'] = dict(supported=True,asof=data.get('asof'),years=data.get('years',5),market=mk,currency=cfg['currency'],benchmark=cfg['label'],
-            company=company,recent_company=recent_rows,resilience=company_evidence.resilience(data),
+            company=company,recent_company=recent_rows,delayed=lagged_analysis(changes(data.get('prices',{}).get('points',[])),benchmark,factors,mk,app.today(),selected_keys),resilience=company_evidence.resilience(data),
             sector=sector_rows,members=members,excluded=excluded,group_size=len(representatives),
             sector_name=a.get('sector',''),warnings=data.get('warnings',[]),references=REFERENCES,models=MODEL_COVERAGE,scope=selected,
             catalog=[dict(key=k,label=FACTORS[k]['label']) for k in cfg['factors']],family_size=len(cfg['factors']),

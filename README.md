@@ -136,3 +136,12 @@ O menu principal reúne seis áreas:
 Os antigos links de stocks dos EUA e de outras bolsas levam à mesma lista filtrada. Os demais links especializados continuam funcionando dentro da área correspondente. A organização da interface não altera posições, operações, indicadores salvos, critérios ou cálculos do recomendador.
 
 Na barra superior, **Bloquear carteira** continua disponível diretamente. **Reiniciar aplicativo** e **Encerrar aplicativo** ficam no menu **Aplicativo**. Na sugestão de aporte, controles de modelos aparecem junto da opção Com IA; demais ajustes ficam recolhidos.
+
+
+## Notas visíveis, análise em lote e cenário atual
+
+Carteira e Analisar ativos voltam a mostrar nota de qualidade, preço de referência aplicável e fatores associados. **Analisar todos os ativos** executa uma rodada com avaliação própria de empresas, FIIs e ETFs, mostrando pendências por produto. Em Mercado, **Analisar todos os setores** permite consultar o catálogo inteiro ou apenas os setores acompanhados, com notícias, indicadores e interpretação opcional por IA local com fontes.
+
+Em Aportar, **Atualizar indicadores** inclui juros brasileiros e americanos, inflação e commodities com data e frequência. **Analisar cenário atual** traz a leitura setorial para revisar o aporte. A pesquisa ampliada depende da chave de busca configurada e não envia posições ou valores. O contexto não altera automaticamente os pesos da alocação; a influência numérica dos modelos de preços é mostrada separadamente.
+
+O dossiê da empresa inclui relações com atrasos fixos, comparações descritivas de subida/queda, amostras e intervalos, sem selecionar o atraso mais favorável. Veja [método e limitações](LONGO_PRAZO.md).

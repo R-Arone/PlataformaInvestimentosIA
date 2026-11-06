@@ -495,6 +495,7 @@ def state():
                     sys.modules[__name__],a,news_feeds,ai_state['sentiment'])
         return {'assets': assets,
                 'contribution_context':contrarian.public_state(sys.modules[__name__],read_cache(c,contrarian.CACHE,{})),
+                'market_research':read_cache(c,'market_batch',None),
                 'exposure_areas':investment_exposure.areas(assets,fixed,saved_exposures,age),
                 'exposure_themes':investment_exposure.THEMES,
                 'issuer_auto':read_cache(c,'issuer_auto',True),
@@ -1776,6 +1777,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/tesouro.js': ('tesouro.js', 'application/javascript'),
                  '/long-term.js': ('long-term.js', 'application/javascript'),
                  '/navigation.js': ('navigation.js', 'application/javascript'),
+                 '/research-dashboard.js': ('research-dashboard.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),

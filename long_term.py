@@ -7,6 +7,7 @@ import portfolio_strategy
 import investment_exposure
 import recommendation_signals
 import contrarian
+import market_research
 
 
 REFERENCES = [
@@ -398,6 +399,7 @@ def recommend(app, data):
     result['exposure_areas']=state.get('exposure_areas',[])
     result['market_context']=state.get('contribution_context',contrarian.public_state(app,{}))
     result['market_ideas']=contrarian.ideas(app,state,result['candidates'],opts['universe'])
+    result['sector_context']=market_research.for_plan(app,state,result['candidates'],opts['universe'])
     result['comparisons']=[]
     style=opts['allocation_style'] if opts['allocation_style'] in ('opportunities','contrarian') else 'gradual'
     scenarios=[(style,1,'Um destino agora'),(style,2,'Até dois destinos'),(style,3,'Até três destinos')]

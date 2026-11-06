@@ -102,6 +102,7 @@ def public_state(app, c, assets=None, fixed=None):
     return {'settings': cfg, 'sentiment': reports, 'scenarios': app.read_cache(c, 'ai_scenarios', [])[-20:][::-1],
             'job': job_state(), 'hf_model': HF_MODEL, 'import_preview': import_preview(app),
             'company_batch': app.read_cache(c,'issuer_batch',None),
+            'market_batch':app.read_cache(c,'market_batch',None),
             'exposures': app.read_cache(c, 'investment_exposures', {}), 'universe': exposure.public_catalog(app, c),
             'quote_errors': app.read_cache(c, 'investment_quote_errors', []),
             'exposure_targets': exposure.target_records(assets or [], fixed or [], app.read_cache(c, 'investment_exposures', {})),
@@ -849,6 +850,9 @@ def start(app, kind, d):
         elif kind == 'issuer_batch':
             import company_batch
             inputs=company_batch.validate(app,d)
+        elif kind == 'market_batch':
+            import market_research
+            inputs=market_research.validate(app,d)
         elif kind == 'factor_ideas':
             import factor_analysis
             inputs = factor_analysis.validate_ideas_request(app,d)
@@ -877,6 +881,9 @@ def start(app, kind, d):
             elif kind == 'issuer_batch':
                 import company_batch
                 company_batch.run(app,inputs)
+            elif kind == 'market_batch':
+                import market_research
+                market_research.run(app,inputs)
             elif kind == 'factor_ideas':
                 import factor_analysis
                 factor_analysis.generate_ideas(app,inputs)
@@ -901,6 +908,7 @@ def start(app, kind, d):
 
 
 def action(app, path, d):
+    if path == '/api/ai/market-batch':return start(app,'market_batch',d)
     if path == '/api/ai/exposure':
         if job_state()['running']:
             raise ValueError('Aguarde a análise antes de alterar exposições.')

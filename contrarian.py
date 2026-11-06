@@ -9,6 +9,7 @@ from portfolio_coupling import completed_prices
 import recommendation_signals as signals
 
 CACHE='allocation_market_context'
+INDICATORS=('rates','us_rates','inflation','brent','iron','copper','soy','long_yield')
 IBOV='https://www.b3.com.br/pt_br/market-data-e-indices/indices/indices-amplos/ibovespa-b3.htm'
 BCB='https://dadosabertos.bcb.gov.br/dataset/1-taxa-de-cambio---livre---dolar-americano-venda---diario'
 IVVB=investment_exposure.CATALOG['IVVB11']['source_url']
@@ -87,26 +88,41 @@ def pullback(app,snapshot,kind):
 
 
 def public_state(app,cached):
+    import factor_analysis
+    indicators=[]
+    for key in INDICATORS:
+        series=cached.get('indicators',{}).get(key,{});meta=factor_analysis.FACTORS[key]
+        observed=factor_analysis.recent(series,meta,app.today()) if series else None
+        indicators.append(dict(key=key,label=meta['label'],unit=meta['unit'],frequency=meta['frequency'],
+            source_url=series.get('source_url'),available=bool(observed),observation=observed))
     return dict(markets=[pullback(app,cached.get('markets',{}).get(key,{}),key) for key in ('brazil','usd')],
+                indicators=indicators,
                 errors=cached.get('errors',[]),retrieved_at=cached.get('retrieved_at'),
                 note='Referências independentes da carteira: Ibovespa e dólar BCB. O máximo usa até 252 observações disponíveis. PTAX é referência, não taxa de remessa. Valores antigos não recebem data nova quando a consulta falha.')
 
 
 def refresh(app,data):
-    if data!={}:raise ValueError('A atualização de mercados não recebe ativos, saldos ou opções de compra.')
-    fetched={};errors=[]
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    if not isinstance(data,dict) or data not in ({},{'indicators':True}) or ('indicators' in data and data['indicators'] is not True):raise ValueError('A atualização recebe apenas a opção de indicadores, sem ativos ou saldos.')
+    fetched={};indicators={};errors=[]
+    with ThreadPoolExecutor(max_workers=4) as pool:
         tasks={key:pool.submit(fn,app.request_json,app.today(),app.now()) for key,fn in (('brazil',index_snapshot),('usd',fx_snapshot))}
+        if data.get('indicators'):
+            import factor_analysis
+            tasks.update({key:pool.submit(factor_analysis.fetch_factor,app,key,app.today()-timedelta(days=400),app.today()) for key in INDICATORS})
         for key,task in tasks.items():
             try:
                 snapshot=task.result()
+                if key in INDICATORS:
+                    if not factor_analysis.recent(snapshot,factor_analysis.FACTORS[key],app.today()):raise ValueError('Sem observação para comparar.')
+                    indicators[key]=snapshot;continue
                 if not pullback(app,snapshot,key)['available']:raise ValueError('Série insuficiente ou antiga; referência anterior preservada.')
                 fetched[key]=snapshot
             except Exception:
-                errors.append(('Bolsa brasileira' if key=='brazil' else 'Dólar')+': consulta indisponível ou sem série recente suficiente; dados anteriores preservados.')
+                label='Bolsa brasileira' if key=='brazil' else 'Dólar' if key=='usd' else factor_analysis.FACTORS[key]['label']
+                errors.append(label+': consulta indisponível ou sem série recente suficiente; dados anteriores preservados.')
     with app.WRITE_LOCK,app.connect() as c:
         previous=app.read_cache(c,CACHE,{})
-        cached=dict(markets={**previous.get('markets',{}),**fetched},errors=errors,retrieved_at=app.now())
+        cached=dict(markets={**previous.get('markets',{}),**fetched},indicators={**previous.get('indicators',{}),**indicators},errors=errors,retrieved_at=app.now())
         app.write_cache(c,CACHE,cached)
     return public_state(app,cached)
 

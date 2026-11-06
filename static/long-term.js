@@ -19,7 +19,7 @@ function longTermView(){
 
 function longTermMarketPanel(context){
  const markets=context?.markets||[];
- return `<section class="panel"><h2>O mercado abriu alguma oportunidade?</h2><p>Avalia quedas observadas da bolsa e do dólar, sem prometer recuperação. Uma única sessão negativa não basta para ativar o contrafluxo.</p><div class="long-term-comparisons">${markets.map(m=>`<article class="hint-box"><b>${esc(m.label)}</b><p>${tag(m.available?(m.active?'Queda relevante para estudar':'Sem queda relevante'):'Dados pendentes',m.active?'good':'warn')}</p>${m.available?`<p>Última referência: <b>${m.key==='usd'?money(m.latest):fmt(m.latest,0)+' pontos'}</b></p><p>Última observação: ${pct(m.return1)}<br>21 observações: ${pct(m.return21)}<br>63 observações: ${pct(m.return63)}<br>Do máximo recente: ${pct(m.drawdown)}</p>`:''}<p>${esc(m.reason)}</p><p class="date-source">${m.asof?dt(m.start)+' a '+dt(m.asof)+' · '+m.count+' observações<br>':''}${esc(m.source||'Fonte ainda não consultada')}${m.source_url?` · <a href="${esc(m.source_url)}" target="_blank" rel="noreferrer">Fonte ↗</a>`:''}</p>${m.rule?`<small>${esc(m.rule)}</small>`:''}</article>`).join('')}</div><p class="form-hint">${esc(context?.note||'Consulte as referências públicas para avaliar as quedas recentes. A lista de ativos e seus saldos ficam neste computador.')}</p>${context?.errors?.length?`<p class="notice warn">${context.errors.map(esc).join(' ')}</p>`:''}<button type="button" class="button secondary" data-action="long-term-market-refresh" ${longTermMarketBusy?'disabled':''}>${longTermMarketBusy?'Consultando bolsa e dólar…':'Atualizar bolsa e dólar'}</button><p id="long-term-market-error" class="form-error" role="alert"></p></section>`;
+ return `<section class="panel"><h2>O mercado abriu alguma oportunidade?</h2><p>Avalia quedas observadas da bolsa e do dólar, sem prometer recuperação. Uma única sessão negativa não basta para ativar o contrafluxo.</p><div class="long-term-comparisons">${markets.map(m=>`<article class="hint-box"><b>${esc(m.label)}</b><p>${tag(m.available?(m.active?'Queda relevante para estudar':'Sem queda relevante'):'Dados pendentes',m.active?'good':'warn')}</p>${m.available?`<p>Última referência: <b>${m.key==='usd'?money(m.latest):fmt(m.latest,0)+' pontos'}</b></p><p>Última observação: ${pct(m.return1)}<br>21 observações: ${pct(m.return21)}<br>63 observações: ${pct(m.return63)}<br>Do máximo recente: ${pct(m.drawdown)}</p>`:''}<p>${esc(m.reason)}</p><p class="date-source">${m.asof?dt(m.start)+' a '+dt(m.asof)+' · '+m.count+' observações<br>':''}${esc(m.source||'Fonte ainda não consultada')}${m.source_url?` · <a href="${esc(m.source_url)}" target="_blank" rel="noreferrer">Fonte ↗</a>`:''}</p>${m.rule?`<small>${esc(m.rule)}</small>`:''}</article>`).join('')}</div><p class="form-hint">${esc(context?.note||'Consulte as referências públicas para avaliar as quedas recentes. A lista de ativos e seus saldos ficam neste computador.')}</p>${context?.errors?.length?`<p class="notice warn">${context.errors.map(esc).join(' ')}</p>`:''}<button type="button" class="button secondary" data-action="long-term-market-refresh" ${longTermMarketBusy?'disabled':''}>${longTermMarketBusy?'Consultando indicadores…':'Atualizar indicadores'}</button><p id="long-term-market-error" class="form-error" role="alert"></p></section>`;
 }
 
 function longTermMarketIdeas(p){
@@ -36,12 +36,12 @@ function longTermContraflow(r){
 document.addEventListener('click',async e=>{
  const b=e.target.closest('[data-action=long-term-market-refresh]');if(!b||longTermMarketBusy)return;
  const f=$('#long-term-form'),request=f?longTermRemember(f):null,revision=++longTermRevision;
- longTermPlan=null;const result=$('#long-term-result');if(result)result.innerHTML='';longTermMarketBusy=true;b.disabled=true;b.textContent='Consultando bolsa e dólar…';
- try{const context=await api('/api/allocation/context',{});S.contribution_context=context;longTermMarketBusy=false;
+ longTermPlan=null;const result=$('#long-term-result');if(result)result.innerHTML='';longTermMarketBusy=true;b.disabled=true;b.textContent='Consultando indicadores…';
+ try{const context=await api('/api/allocation/context',{indicators:true});S.contribution_context=context;longTermMarketBusy=false;
   const panel=$('#long-term-markets');if(panel)panel.innerHTML=longTermMarketPanel(context);
   if(view==='long-term'&&revision===longTermRevision&&request&&Number(request.amount)>0&&f.checkValidity())await longTermGenerate(request);
  }catch(ex){longTermMarketBusy=false;const error=$('#long-term-market-error');if(error){error.textContent=ex.message;error.style.display='block';}}
- finally{const current=$('[data-action=long-term-market-refresh]');if(current){current.disabled=false;current.textContent='Atualizar bolsa e dólar';}}
+ finally{const current=$('[data-action=long-term-market-refresh]');if(current){current.disabled=false;current.textContent='Atualizar indicadores';}}
 });
 
 function longTermContext(c){
