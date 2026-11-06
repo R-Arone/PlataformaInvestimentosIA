@@ -382,6 +382,9 @@ def start_initial(app):
 
 
 def action(app,path,d):
+    if path in ('/api/issuer/complete','/api/issuer/completion-review'):
+        import company_completion
+        return market_ai.start(app,'issuer_completion',d) if path.endswith('/complete') else company_completion.review(app,d)
     if path=='/api/issuer/batch':
         return market_ai.start(app,'issuer_batch',d)
     if path=='/api/issuer/factor-ideas':

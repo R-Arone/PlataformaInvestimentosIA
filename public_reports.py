@@ -4,6 +4,11 @@ import csv
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
+from contextlib import contextmanager
+from pathlib import Path
+import hashlib
+import tempfile
+import threading
 import io
 import json
 import math
@@ -12,6 +17,18 @@ import urllib.request
 import zipfile
 
 CVM = 'https://dados.cvm.gov.br/dados/'
+_SHARED_ARCHIVES=None
+_ARCHIVE_LOCK=threading.Lock()
+
+
+@contextmanager
+def shared_archives(directory):
+    """A bounded, disposable cache of public ZIPs for one multi-company job."""
+    global _SHARED_ARCHIVES
+    with tempfile.TemporaryDirectory(prefix='tmp-public-cvm-',dir=directory) as folder:
+        previous=_SHARED_ARCHIVES;_SHARED_ARCHIVES=Path(folder)
+        try:yield
+        finally:_SHARED_ARCHIVES=previous
 
 
 def digits(v):
@@ -28,12 +45,23 @@ def numeric(v):
 @lru_cache(maxsize=6)
 def archive(url, week):
     # Cache public compressed bytes only; never issuer/user holdings. Weekly revisions expire.
+    cache=_SHARED_ARCHIVES/(hashlib.sha256((url+str(week)).encode()).hexdigest()+'.zip') if _SHARED_ARCHIVES else None
+    if cache:
+        try:
+            data=cache.read_bytes()
+            if len(data)<=35_000_000:return data
+        except OSError:pass
     req = urllib.request.Request(url, headers={'User-Agent': 'AporteBrasil/1.0'})
     try:
         with urllib.request.urlopen(req, timeout=25) as response: data = response.read(35_000_001)
         if len(data) > 35_000_000: raise ValueError('Arquivo público excede o limite de consulta.')
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             if sum(i.file_size for i in z.infolist()) > 2_000_000_000: raise ValueError('Arquivo CVM excessivo após descompactação.')
+        if cache:
+            try:
+                with _ARCHIVE_LOCK:
+                    if sum(p.stat().st_size for p in cache.parent.glob('*.zip'))+len(data)<=640_000_000:cache.write_bytes(data)
+            except OSError:pass
         return data
     except (OSError, zipfile.BadZipFile) as exc:
         raise ValueError('Arquivo CVM indisponível; dados anteriores preservados.') from exc

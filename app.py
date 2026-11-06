@@ -477,6 +477,9 @@ def state():
             a['value_reading']=investment_value.reference(sys.modules[__name__],a,read_cache(c,'valuation_cases',{}))
             a['sector_rating']=investment_risk.rating(a)
             a['risk_group']=investment_risk.group(a)
+            if a.get('company_research'):
+                import company_completion
+                company_completion.enrich(sys.modules[__name__],a)
             a.pop('_statement_metrics', None)
             a.pop('_fii_metrics', None)
         factor_analysis.enrich(sys.modules[__name__], assets)
@@ -1787,6 +1790,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/navigation.js': ('navigation.js', 'application/javascript'),
                  '/research-dashboard.js': ('research-dashboard.js', 'application/javascript'),
                  '/accessibility.js': ('accessibility.js', 'application/javascript'),
+                 '/completion.js': ('completion.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),

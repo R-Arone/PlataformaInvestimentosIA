@@ -6,7 +6,7 @@ import re
 KIND = 'issuer_quality_facts'
 BOOL_FIELDS = ('innovation', 'obsolete_sector', 'dividend_payments', 'blue_chip',
                'good_management', 'corruption_history', 'state_controlled', 'single_client_concentration')
-FACT_FIELDS = (*BOOL_FIELDS, 'founded', 'sector_origin_year', 'leadership')
+FACT_FIELDS = (*BOOL_FIELDS, 'founded', 'founded_year', 'sector_origin_year', 'leadership')
 
 
 def validate_snapshot(app, data):
@@ -34,7 +34,7 @@ def validate_snapshot(app, data):
         elif key == 'founded':
             value = past(value)
             if value > ref: raise ValueError('Fundação posterior à data da evidência.')
-        elif key == 'sector_origin_year':
+        elif key in ('sector_origin_year','founded_year'):
             if type(value) is not int or not 1 <= value <= int(ref[:4]):
                 raise ValueError('Ano de origem do setor inválido.')
         else:
@@ -167,6 +167,10 @@ def assess(app, asset):
         status = 'pass' if (origin.year,origin.month,origin.day)<cutoff else 'fail'
         add('age30', 'Tem mais de 30 anos de mercado desde a fundação?', status,
             f'Fundação: {origin.isoformat()}; {years} anos completos. A data de IPO/listagem não substitui a fundação.', [founded])
+    elif fact('founded_year',False):
+        founded=fact('founded_year',False);age=app.today().year-founded['value']
+        add('age30','Tem mais de 30 anos de mercado desde a fundação?', 'pass' if age>30 else 'fail' if age<30 else 'unknown',
+            f"Ano de fundação: {founded['value']}; dia e mês não informados. No ano do 30º aniversário, o ano sozinho não comprova o critério.",[founded])
     else:add('age30','Tem mais de 30 anos de mercado desde a fundação?')
     leader = fact('leadership')
     add('leader', 'É líder nacional ou mundial, na primeira colocação?',

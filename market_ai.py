@@ -103,6 +103,7 @@ def public_state(app, c, assets=None, fixed=None):
             'job': job_state(), 'hf_model': HF_MODEL, 'import_preview': import_preview(app),
             'company_batch': app.read_cache(c,'issuer_batch',None),
             'market_batch':app.read_cache(c,'market_batch',None),
+            'completion_batch':app.read_cache(c,'issuer_completion_batch',None),
             'exposures': app.read_cache(c, 'investment_exposures', {}), 'universe': exposure.public_catalog(app, c),
             'quote_errors': app.read_cache(c, 'investment_quote_errors', []),
             'exposure_targets': exposure.target_records(assets or [], fixed or [], app.read_cache(c, 'investment_exposures', {})),
@@ -383,14 +384,16 @@ def mechanical_scenario(inputs, assets):
     return sectors
 
 
-def research(app, question):
+def research(app, question, queries=None):
     with app.connect() as c:
         key = app.read_cache(c, 'ai_search_key', '') or os.environ.get('OLLAMA_API_KEY', '')
     if not key:
         raise ValueError('Para pesquisar, configure a chave Ollama de busca na internet. A inferência local funciona sem ela.')
+    if queries is not None and (not isinstance(queries,list) or not 1<=len(queries)<=4 or any(not isinstance(q,str) or not q.strip() or len(q)>1500 for q in queries)):raise ValueError('Consultas de pesquisa fora do limite.')
     sources, errors = [], []
     # Fixed bounded queries; the LLM cannot execute arbitrary tools or choose URLs to fetch.
-    for query in (question + ' economia setores ETFs bancos centrais Brasil global fontes', question + ' episódios históricos crises Brasil global estudo'):
+    for query_index,query in enumerate(queries or (question + ' economia setores ETFs bancos centrais Brasil global fontes', question + ' episódios históricos crises Brasil global estudo')):
+        read_in_query=0
         r = request('https://ollama.com/api/web_search', {'query': query[:1800], 'max_results': 4}, key)
         if not isinstance(r, dict) or not isinstance(r.get('results'), list):
             raise ValueError('A pesquisa devolveu um formato inválido.')
@@ -402,7 +405,9 @@ def research(app, question):
                 continue
             source = {'id': len(sources) + 1, 'title': str(item.get('title', 'Fonte'))[:300], 'url': url,
                       'content': str(item.get('content', ''))[:2500], 'kind': 'search_excerpt', 'retrieved_at': app.now()}
-            if len(sources) < 3:
+            should_read=len(sources)<3 if queries is None else read_in_query<(2 if query_index<6-len(queries) else 1)
+            if should_read:
+                read_in_query+=1
                 try:
                     fetched = request('https://ollama.com/api/web_fetch', {'url': url}, key)
                     if isinstance(fetched.get('content'), str) and fetched['content'].strip():
@@ -853,6 +858,9 @@ def start(app, kind, d):
         elif kind == 'market_batch':
             import market_research
             inputs=market_research.validate(app,d)
+        elif kind == 'issuer_completion':
+            import company_completion
+            inputs=company_completion.validate_request(app,d)
         elif kind == 'factor_ideas':
             import factor_analysis
             inputs = factor_analysis.validate_ideas_request(app,d)
@@ -884,6 +892,9 @@ def start(app, kind, d):
             elif kind == 'market_batch':
                 import market_research
                 market_research.run(app,inputs)
+            elif kind == 'issuer_completion':
+                import company_completion
+                company_completion.run(app,inputs)
             elif kind == 'factor_ideas':
                 import factor_analysis
                 factor_analysis.generate_ideas(app,inputs)

@@ -8,7 +8,7 @@ import market_brief
 import company_insights
 import company_quality
 
-KINDS = ('issuer_profile', 'issuer_quarters', 'issuer_market_history', 'issuer_dividend_history', 'issuer_opinions', company_quality.KIND) + company_insights.KINDS
+KINDS = ('issuer_profile', 'issuer_quarters', 'issuer_market_history', 'issuer_dividend_history', 'issuer_opinions', company_quality.KIND, 'issuer_completion') + company_insights.KINDS
 CURRENCIES = ('BRL', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'CHF', 'AUD')
 
 
@@ -25,6 +25,9 @@ def value(app, v, nonnegative=False):
 
 
 def validate_snapshot(app, kind, d):
+    if kind=='issuer_completion':
+        import company_completion
+        return company_completion.validate_snapshot(app,d)
     if kind == company_quality.KIND:
         return company_quality.validate_snapshot(app, d)
     if kind in company_insights.KINDS:

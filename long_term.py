@@ -199,7 +199,7 @@ def candidate(app, asset, state, opts, budgets, risk=None):
     return dict(id=asset['id'], ticker=asset['ticker'], name=asset['name'], asset_type=asset.get('asset_type'),
                 sector=asset.get('sector'), issuer=issuer(asset), sector_key=sector(asset),
                 class_key=cls, class_label=class_row['label'], held=item['held'], value=item['value'],
-                quality=round(quality, 2) if quality is not None else None, coverage=round(coverage, 2),
+                quality=round(quality, 2) if quality is not None else None, quality_known=round(counts['pass']/measured*100,2) if measured and quality is not None else None, coverage=round(coverage, 2),
                 counts=counts, failures=fails, pending=[c['label'] for c in checks+price_checks if c['status']=='unknown'],
                 previous_score=asset.get('analysis', {}).get('score'), priority=priority,
                 components=dict(quality=quality, discount=discount, rebalance=need,contraflow=contraflow['score'] if contra else None,

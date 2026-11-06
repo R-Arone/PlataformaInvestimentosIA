@@ -153,4 +153,11 @@ A lista e o aporte exibem **Barato com margem**, **Caro pelas premissas**, **Per
 
 O contrafluxo fundamental passa a combinar 35% qualidade, 25% valor/desconto, 15% queda observada, 5% necessidade da classe, 10% setor e 10% diversificação. Considera os grupos setoriais equivalentes que já existem na carteira, produtos relacionados e pares com histórico comparável; o próximo destino reconsidera as compras já propostas. Mostra os pesos por setor antes/depois, preservando os limites sobre o dinheiro efetivamente investido. Sem histórico, a nota de correlação é neutra e a cobertura é informada. Veja o [método e as limitações](LONGO_PRAZO.md).
 
-Em **Configurações → Cores e acessibilidade**, ative o modo daltônico: azul para positivos, roxo para negativos, incluindo correlações e gráficos, com sinais e rótulos preservados. A preferência fica salva no banco local.
+Em **Configurações → Cores e acessibilidade**, ative o modo daltônico: ciano para positivos, roxo para negativos, incluindo correlações e gráficos, com sinais e rótulos preservados. A preferência fica salva no banco local.
+
+
+## Preenchimento geral de dados e origem da pesquisa
+
+Use **Completar dados das empresas** na lista ou **Completar dados faltantes** no checklist. O fluxo consulta os históricos públicos e pode pesquisar os campos restantes com IA local e busca configurada. Propostas têm trecho, fonte e período; podem ser editadas e revisadas em lote antes de entrar nos critérios. A marca **✦ Pesquisa IA** distingue origem revisada e alterações suas. Registros manuais são preservados e fontes indisponíveis continuam sinalizadas.
+
+A nota de qualidade agora mostra o resultado dos critérios conhecidos junto da cobertura: sem dados e critério negativo são situações diferentes. A prioridade de aporte mantém a base conservadora e os bloqueios. Nos fatores associados, positivo/negativo têm cores próprias; ausência de evidência fica neutra. O modo daltônico usa **ciano e roxo**, incluindo gráficos e correlações. Veja [método, fontes e limitações](LONGO_PRAZO.md).

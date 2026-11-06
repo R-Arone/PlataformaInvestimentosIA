@@ -30,6 +30,7 @@ MODULES.add('recommendation_signals.py')
 MODULES.add('contrarian.py')
 MODULES.add('market_research.py')
 MODULES.update(('investment_value.py','investment_risk.py'))
+MODULES.add('company_completion.py')
 ROOT_FILES.add('LONGO_PRAZO.md')
 
 # Ensaios dependentes de bases locais ou de ferramentas offline nao publicadas.

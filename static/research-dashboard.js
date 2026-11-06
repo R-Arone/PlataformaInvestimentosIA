@@ -7,8 +7,10 @@ function researchScore(a){
  if(!['stock','foreign','global_stock','fii'].includes(a.asset_type))return null;
  const study=a.fii_research?.study||a.company_research?.study;
  const checks=(study?.groups||[]).filter(g=>g.key!=='price').flatMap(g=>g.checks||[]).filter(c=>c.status!=='na'&&c.scope!=='price');
- return checks.length?100*checks.filter(c=>c.status==='pass').length/checks.length:null;
+ const measured=checks.filter(c=>['pass','fail'].includes(c.status));
+ return measured.length?100*measured.filter(c=>c.status==='pass').length/measured.length:null;
 }
+function researchCoverage(a){if(!['stock','foreign','global_stock','fii'].includes(a.asset_type))return 'Nota de empresa não aplicável';const s=a.fii_research?.study||a.company_research?.study,c=s?.counts;if(!c)return 'Sem critérios medidos';const total=c.pass+c.fail+c.unknown;return `${c.pass+c.fail}/${total} conhecidos · ${c.fail} negativos · ${c.unknown} sem dados`;}
 function researchReference(a){const p=a.value_reading,r=p?.reading;
  if(!r)return '<span class="muted">Sem referência aplicável / premissas a conferir</span>';
  return `${tag(esc(r.label),r.status==='cheap'?'good':r.status==='expensive'?'bad':'warn')}${p.reference>0?`<b>${money(p.reference)}</b><small>Teto: ${money(p.ceiling)} · ${esc(p.method)} · ${dt(p.asof)}</small>`:''}${r.disagreement?'<small>Métodos divergem; conferir premissas</small>':''}`;
@@ -16,10 +18,11 @@ function researchReference(a){const p=a.value_reading,r=p?.reading;
 function decisionSectorScore(a){const r=a.sector_rating;return r?.score!=null?button('sector-rating-open','Setor '+fmt(r.score,0)+'/100','text-button',`data-id="${a.id}"`)+`<small>${esc(r.label)} · premissa estrutural</small>`:'<small>Sem nota estrutural de setor aplicável</small>';}
 function researchFactors(a){
  const f=a.company_research?.factor_analysis;if(!f?.supported)return '<span class="muted">Critérios do produto</span>';
- const rows=(f.company||[]).filter(r=>['positive','negative'].includes(r.status)).map(r=>({key:r.key,text:r.label+' '+(r.status==='positive'?'↑':'↓')+' · mesmo mês'}));
+ const rows=(f.company||[]).filter(r=>['positive','negative'].includes(r.status)).map(r=>({key:r.key,status:r.status,text:r.label+' '+(r.status==='positive'?'↑':'↓')+' · mesmo mês'}));
  for(const factor of f.delayed?.factors||[]){if(rows.some(r=>r.key===factor.key))continue;const valid=factor.models.filter(m=>['positive','negative'].includes(m.status));if(!valid.length)continue;
-  const signs=new Set(valid.map(m=>m.status));rows.push({key:factor.key,lag:true,text:factor.label+(signs.size>1?' · varia com atraso':' '+(valid[0].status==='positive'?'↑':'↓')+' · '+valid.map(m=>m.lag_months).join('/')+' m')});}
- return rows.length?`<div class="research-factors">${rows.slice(0,3).map(r=>button('factor-open',esc(r.text),'research-factor',`data-id="${a.id}" data-research-factor="true" data-research-lag="${!!r.lag}"`)).join('')}</div>`:button('factor-open','Consultar relações','text-button',`data-id="${a.id}"`);
+  const signs=new Set(valid.map(m=>m.status));rows.push({key:factor.key,status:signs.size>1?'mixed':valid[0].status,lag:true,text:factor.label+(signs.size>1?' · sinais distintos':' '+(valid[0].status==='positive'?'↑':'↓')+' · '+valid.map(m=>m.lag_months).join('/')+' m')});}
+ const unknown=(f.company||[]).every(r=>r.status==='insufficient')?'? Histórico insuficiente':(f.company||[]).some(r=>r.status==='stale')?'? Atualizar histórico':'? Sem associação demonstrada';
+ return rows.length?`<div class="research-factors">${rows.slice(0,3).map(r=>button('factor-open',esc(r.text),'research-factor association-'+r.status,`data-id="${a.id}" data-research-factor="true" data-research-lag="${!!r.lag}" title="${r.status==='positive'?'Associação positiva: movimentos na mesma direção':r.status==='negative'?'Associação negativa: movimentos em direções opostas':'Sinais diferentes conforme o atraso'}. Não é nota de compra."`)).join('')}</div>`:button('factor-open',unknown,'research-factor association-unknown',`data-id="${a.id}"`);
 }
 function researchColumns(html){
  const t=document.createElement('template');t.innerHTML=html;
@@ -29,7 +32,7 @@ function researchColumns(html){
   table.dataset.researchColumns='true';
   const head=$('thead tr',table);if(head)head.firstElementChild.insertAdjacentHTML('afterend','<th>Nota de qualidade</th><th>Preço de referência</th><th>Fatores associados</th>');
   for(const row of rows){const a=assetById($('[data-action=detail]',row).dataset.id);if(!a)continue;const score=researchScore(a);
-   row.firstElementChild.insertAdjacentHTML('afterend',`<td data-label="Nota de qualidade">${score===null?'—':fmt(score,0)+'/100'}<small>Empresa / fundo · pendências contam no total</small>${decisionSectorScore(a)}</td><td data-label="Preço de referência">${researchReference(a)}</td><td data-label="Fatores associados">${researchFactors(a)}</td>`);}
+   row.firstElementChild.insertAdjacentHTML('afterend',`<td data-label="Nota de qualidade">${score===null?'—':fmt(score,0)+'/100'}<small>Critérios conhecidos · ${researchCoverage(a)}</small>${decisionSectorScore(a)}</td><td data-label="Preço de referência">${researchReference(a)}</td><td data-label="Fatores associados">${researchFactors(a)}</td>`);}
  }
  return t.innerHTML;
 }
@@ -102,6 +105,7 @@ const decisionCandidateBefore=longTermCandidate,decisionResultBefore=longTermRes
 function decisionCorrelation(p){return `<span class="${p.correlation>=0?'positive':'negative'}">${p.correlation>=0?'+':''}${fmt(p.correlation,2)}</span>`;}
 longTermCandidate=function(r,index){
  const t=document.createElement('template');t.innerHTML=decisionCandidateBefore(r,index);const root=t.content,d=r.diversification,s=r.sector_rating,v=r.price.reading;
+ const quality=$('.long-term-metrics>div:first-child',root);if(quality&&r.quality_known!==undefined&&['stock','fii'].includes(r.asset_type)){$('b',quality).textContent=r.quality_known==null?'Sem critérios medidos':fmt(r.quality_known,1)+'/100';$('span',quality).textContent=`Conhecidos · cobertura ${pct(r.coverage)} · ${r.counts.fail} negativos · ${r.counts.unknown} sem dados. Base conservadora do aporte: ${fmt(r.quality,1)}/100.`;}
  const reference=$('.long-term-metrics>div:nth-child(3)',root);if(reference&&v)reference.insertAdjacentHTML('afterbegin',tag(esc(v.label),v.status==='cheap'?'good':v.status==='expensive'?'bad':'warn'));
  if(d)$('.long-term-metrics',root)?.insertAdjacentHTML('afterend',`<div class="decision-risk-grid"><article><small>Nota estrutural do setor</small><b>${s?.score==null?'Sem nota aplicável':fmt(s.score,0)+'/100'}</b><p>${esc(s?.label||r.sector)} · ${esc(s?.assessment||'Conferir classificação')}</p>${s?.score!=null?button('sector-rating-open','Entender a nota do setor','text-button',`data-id="${r.id}"`):''}</article><article><small>Concentração e sobreposição</small><b>${pct(d.sector_weight)} → ${pct(r.after_sector_weight??d.sector_weight)}</b><p>${esc(d.group.label)} · limite de ${pct(S.settings.sector_limit)} da carteira negociada investida.</p><small>Produtos relacionados: ${pct(d.related_product_weight)} antes do aporte · ${d.related_products.map(esc).join(' · ')||'nenhum'}. Valores integrais dos produtos, sem pesos internos estimados.</small></article><article><small>${r.strategy==='contrarian'&&r.asset_type!=='etf'?'Diversificação na prioridade':'Diversificação · contexto e limites'}</small><b>${fmt(d.score,1)}/100</b><p>Cobertura da comparação histórica: ${pct(d.correlation_coverage)} do valor já investido.</p>${d.pairs.length?d.pairs.slice(0,2).map(p=>`<p>${esc(p.ticker)}: ${decisionCorrelation(p)} · ${p.n} retornos · ${dt(p.start)} a ${dt(p.end)}${p.correlation>=.75?' · aproximação elevada':''}</p>`).join(''):'<p>Sem pares comparáveis suficientes. Histórico ausente não comprova independência.</p>'}<small>${r.strategy==='contrarian'&&r.asset_type!=='etf'?'Nota antes do aporte; o próximo destino reconsidera as compras já propostas.':'Escore informativo neste método; limites de concentração continuam valendo.'} Correlação positiva: movimentos na mesma direção. Negativa: direções opostas. Relações podem mudar.</small></article></div>`);
  return t.innerHTML.replace('40% qualidade + 30% desconto + 20% contrafluxo + 10% necessidade da classe.','35% qualidade + 25% valor/desconto + 15% contrafluxo + 5% necessidade da classe + 10% setor + 10% diversificação. A seleção reconsidera a sobreposição após cada destino proposto.');
