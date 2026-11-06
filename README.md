@@ -167,3 +167,11 @@ A nota de qualidade agora mostra o resultado dos critérios conhecidos junto da 
 Os cartões de Aportar ficam compactos, com quatro áreas clicáveis: queda, preço/valor, qualidade e setor/carteira. Os detalhes mostram indicadores, fórmula, premissas, fontes, dados faltantes e critérios individuais. **Investidor10** abre diretamente a página da ação, FII ou ETF brasileiro. Queda e valor fundamental são avaliados separadamente; falta de referência continua explícita.
 
 Em **Início** e **Carteira**, **Posições para revisar** reúne reprovações atuais, critérios perdidos desde o início do acompanhamento local e alertas de preço pelas premissas salvas. Mudança de regra e falta de dados têm tratamentos distintos. Preço muito acima dos modelos exige ao menos duas famílias aplicáveis com entradas conferíveis; bases limitadas ficam identificadas. FIIs preservam a regra própria de P/VP acima de 1,5. O painel ajuda a revisar manutenção ou redução, sem executar vendas. Veja [regras e limites](LONGO_PRAZO.md).
+
+## Escolher o cálculo e preencher perguntas
+
+Em **Aportar → Está barato?**, escolha Automático, Bazin, Graham ou outro método disponível para a ação, preencha os valores e salve. A referência e o teto ficam visíveis no cartão e entram na nova simulação. Há média/mediana histórica de P/L e P/VP quando existe uma amostra suficiente de múltiplos datados; cotação antiga isolada não vira valor justo.
+
+**Preencher automaticamente** consulta fontes públicas e, quando configurada, a busca com IA. O cadastro CVM completa constituição jurídica e controle por CNPJ confirmado na B3; sugestões interpretativas vêm com trecho, fonte e marca ✦ para revisão em lote. Campos existentes são preservados.
+
+**Configurações → Ollama · pesquisa e análises** permite detectar modelos, escolher o modelo local e cadastrar a chave do Ollama Web Search. A análise roda pela conexão local; a busca na internet exige a chave da conta Ollama. As notas e os modelos estatísticos mantêm seus próprios cálculos. Veja [métodos e limitações](LONGO_PRAZO.md).

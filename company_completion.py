@@ -170,6 +170,14 @@ def refresh_public(app,a):
         except Exception as exc:
             if str(app.DB_PATH)!=scope:raise ValueError('O banco mudou; pesquisa interrompida.')
             warnings.append(kind+': '+(str(exc) if isinstance(exc,ValueError) else 'fonte indisponível; dados anteriores preservados.'))
+    if a['asset_type']=='stock':
+        import company_registry
+        try:
+            added=company_registry.fill(app,company_research.asset(app,a['id']))
+            if added:received.extend('cadastro_cvm:'+key for key in added)
+        except Exception as exc:
+            if str(app.DB_PATH)!=scope:raise ValueError('O banco mudou; pesquisa interrompida.')
+            warnings.append('Cadastro CVM: '+(str(exc) if isinstance(exc,ValueError) else 'fonte indisponível; registros anteriores preservados.'))
     return dict(received=received,warnings=warnings[:40])
 
 
@@ -206,7 +214,7 @@ def run_company(app,aid,d,index):
     a=company_research.asset(app,aid);old=a['snapshots'].get(KIND,{}).get('data',{});items=[];sources=[];model='Fontes públicas estruturadas'
     if d['use_ai']:
         try:items,sources,errors,model=propose(app,a,missing(app,a)[1]);warnings.extend(errors)
-        except Exception:warnings.append('Pesquisa com IA indisponível. Confira modelo local e chave de busca; nenhum campo interpretativo foi inventado.')
+        except Exception as exc:warnings.append('Pesquisa com IA indisponível. '+(str(exc)[:300] if isinstance(exc,ValueError) else 'Confira o modelo local e a chave Ollama de busca.')+' Nenhum campo interpretativo foi inventado.')
     kept=list({(c['kind'],c['key']):copy.deepcopy(c) for c in old.get('candidates',[]) if c['status']=='accepted'}.values());old_sources=old.get('sources',[]);offset=max((s['id'] for s in old_sources),default=0)
     for s in sources:s['id']+=offset
     for item in items:item['source_id']+=offset
@@ -215,7 +223,7 @@ def run_company(app,aid,d,index):
     if str(app.DB_PATH)!=scope:raise ValueError('O banco mudou; pesquisa interrompida.')
     company_history.save(app,a,KIND,report,'Pesquisa de lacunas · fontes públicas e sugestões da IA para revisão')
     a=company_research.asset(app,aid);after,_=missing(app,a)
-    return dict(asset_id=aid,ticker=a['ticker'],before=len(before),after=len(after),proposals=len(items),received=received,warnings=report['warnings'])
+    return dict(asset_id=aid,ticker=a['ticker'],before=len(before),after=len(after),proposals=len(items),received=received,warnings=report['warnings'],model=model)
 
 def review(app,d):
     import company_research

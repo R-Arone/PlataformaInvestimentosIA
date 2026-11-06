@@ -64,7 +64,8 @@ def reference(app, asset, cases):
         if not recent(app, saved.get('saved_at'), 180):
             base['issues'].append('Salve ou revise as premissas de avaliação; validade de 180 dias.')
         chosen = next((r for r in valuation.get('methods', []) if r.get('method') == suggestion.get('method')), {})
-        if chosen.get('role') not in ('primary', 'complementary'):
+        manual=suggestion.get('mode')=='manual' and valuation.get('inputs',{}).get('reference_method')==chosen.get('method') and chosen.get('role') not in (None,'not_applicable')
+        if chosen.get('role') not in ('primary', 'complementary') and not manual:
             base['issues'].append('Falta um método de avaliação aplicável ao negócio.')
         if set(chosen.get('requirements', [])) & set(valuation.get('estimates', [])):
             base['issues'].append('Confira as entradas estimadas por múltiplos antes de usar o preço de referência.')

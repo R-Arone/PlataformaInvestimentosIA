@@ -1,6 +1,7 @@
 """Transparent scenario arithmetic, never a price forecast or automatic trade."""
 import math
 import sector_analysis
+import valuation_history
 
 FIELDS = {
     'dividend_growth': ('Crescimento dos dividendos na projeção (%)', -99, 100),
@@ -87,7 +88,7 @@ def apply_policy(result, selection):
     for row in result['methods']:
         name = row['method']
         row['role'] = ('primary' if name in selection['primary'] else 'complementary' if name in selection['complementary']
-                       else 'screening' if name in ('Bazin', 'Graham', 'PEG / Lynch') else 'other')
+                       else 'screening' if name in ('Bazin', 'Graham', 'PEG / Lynch') else 'historical' if name in valuation_history.METHODS else 'other')
         if selection['profile'] in ('bank', 'insurance') and name in (FCFF, EV):
             row.update(role='not_applicable', value=None, ceiling=None, premium=None, classification='unknown', price_gap=None)
     # Do not count equivalent stable RI and multistage RI as independent votes.
@@ -97,9 +98,14 @@ def apply_policy(result, selection):
     chosen = next((available[n] for n in selection['primary'] if n in available), None)
     fallback = chosen is None
     chosen = chosen or next((available[n] for n in selection['complementary'] if n in available), None)
+    requested=result.get('inputs',{}).get('reference_method','auto')
+    if requested!='auto':
+        chosen=next((m for m in result['methods'] if m['method']==requested and m['role']!='not_applicable'),None)
+        fallback=False
     result['suggestion'] = dict(method=chosen['method'] if chosen else None, value=chosen['value'] if chosen else None,
         ceiling=chosen['ceiling'] if chosen else None, fallback=fallback and chosen is not None,
-        note='Referência condicional do primeiro método prioritário com dados; sem média entre fórmulas. O teto aplica a margem escolhida. Métodos de triagem não geram o preço sugerido.')
+        mode='manual' if requested!='auto' else 'auto',
+        note=('Método escolhido por você; valor condicionado às entradas e à adequação ao negócio. Bazin/Graham são triagens, e múltiplos históricos são comparação relativa; confira sustentabilidade e mudanças no negócio.' if requested!='auto' else 'Referência condicional do primeiro método prioritário com dados; sem média entre fórmulas. Métodos de triagem só viram referência quando escolhidos explicitamente.')+' O teto aplica a margem escolhida.')
     result['comparison'] = comparison(eligible)
     return result
 
@@ -136,7 +142,7 @@ def data_plan(result, origins, saved):
     }
     keys=['eps','bvps','dividends_per_share']
     for method in result['methods']:
-        if method['role'] in ('primary','complementary'):
+        if method['role'] in ('primary','complementary') or method['method']==result['inputs'].get('reference_method'):
             keys.extend(k for k in method['requirements'] if k not in keys)
     out=[]
     for key in keys:
@@ -190,6 +196,7 @@ def for_asset(asset,saved,number,age):
     inputs.setdefault('target_yield',6);inputs.setdefault('safety_margin',20)
     result=calculate(inputs,number)
     result.update(origins=origins,estimates=estimates,has_saved=bool(saved))
+    valuation_history.attach(result,asset,age)
     apply_policy(result,policy(asset,result['inputs']))
     result['basis_note']='Estimativas por múltiplos podem usar bases de preços diferentes: confira LPA, VPA e proventos no RI. DY é passado e não garante dividendos futuros. Campos vazios ficam sem cálculo.'
     result['data_plan'] = data_plan(result,origins,saved)
@@ -207,6 +214,9 @@ REFERENCES += [
  {'title':'Damodaran · avaliação por múltiplos','url':'https://pages.stern.nyu.edu/~adamodar/New_Home_Page/valuation/val.htm'}]
 
 def calculate(d,number):
+    reference=d.get('reference_method','auto');historical_stat=d.get('historical_stat','mean')
+    if not isinstance(reference,str) or reference not in ('auto',*METHOD_FIELDS,*valuation_history.METHODS):raise ValueError('Escolha um método de referência válido.')
+    if not isinstance(historical_stat,str) or historical_stat not in ('mean','median'):raise ValueError('Escolha média ou mediana histórica.')
     def n(k,lo=None,hi=None):
         if isinstance(d.get(k),bool):raise ValueError('Premissa numérica inválida: '+k)
         return number(d.get(k),False,lo,hi)
@@ -354,7 +364,7 @@ def calculate(d,number):
             'field_catalog':{k:dict(label=v[0],min=v[1],max=v[2]) for k,v in FIELDS.items()},
             'inputs':dict(price=price,dividends_per_share=dps,eps=eps,bvps=bvps,target_yield=target,required_return=required,growth=growth,safety_margin=margin,
             fair_tolerance=tolerance,target_pe=multiple,normalized_roe=roe,fcfe_per_share=fcfe,fcfe_growth=fg,terminal_growth=tg,forecast_years=years,
-            **extra,fcfe_forecast=fcfe_path,fcff_forecast=fcff_path,assumption_notes=notes,valuation_profile=chosen_profile),
+            **extra,fcfe_forecast=fcfe_path,fcff_forecast=fcff_path,assumption_notes=notes,valuation_profile=chosen_profile,reference_method=reference,historical_stat=historical_stat),
             'dividend_yield':dps/price*100 if price and dps is not None else None,
             'payout':dps/eps*100 if dps is not None and eps is not None and eps>0 else None,
             'stress_bazin':dps*.75/(target/100) if dps is not None and dps>0 and target else None,

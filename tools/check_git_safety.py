@@ -32,6 +32,7 @@ MODULES.add('market_research.py')
 MODULES.update(('investment_value.py','investment_risk.py'))
 MODULES.add('company_completion.py')
 MODULES.update(('investment_decision.py','portfolio_review.py'))
+MODULES.update(('valuation_history.py','company_registry.py'))
 ROOT_FILES.add('LONGO_PRAZO.md')
 
 # Ensaios dependentes de bases locais ou de ferramentas offline nao publicadas.

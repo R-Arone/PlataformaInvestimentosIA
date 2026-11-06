@@ -1794,6 +1794,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/accessibility.js': ('accessibility.js', 'application/javascript'),
                  '/completion.js': ('completion.js', 'application/javascript'),
                  '/aporte-cards.js': ('aporte-cards.js', 'application/javascript'),
+                 '/valuation-choice.js': ('valuation-choice.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),
@@ -1887,6 +1888,7 @@ class Handler(BaseHTTPRequestHandler):
                 selected=next((a for a in state()['assets'] if a['id']==d.get('asset_id')),None)
                 if selected:
                     if selected['asset_type']!='stock':raise ValueError('Escolha uma ação de empresa para avaliar.')
+                    valuation.valuation_history.attach(result,selected,age)
                     valuation.apply_policy(result,valuation.policy(selected,result['inputs']))
                 if d.get('save'):
                     with WRITE_LOCK,connect() as c:

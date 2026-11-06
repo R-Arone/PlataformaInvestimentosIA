@@ -34,7 +34,7 @@ def explain(app,a,row,state):
     inputs=[dict(key=r['field'],label=r.get('label'),value=copy.deepcopy(valuation.get('inputs',{}).get(r['field'])),asof=r.get('asof'),source=r.get('source'),estimated=r['field'] in valuation.get('estimates',[])) for r in plan]
     reading=row['price'].get('reading',{});fallen=bool((row.get('contraflow') or {}).get('active'))
     summary=('Queda observada; ainda falta demonstrar o valor.' if fallen and reading.get('status','unknown')=='unknown' else
-             'Desconto com margem; confira os bloqueios de qualidade.' if reading.get('status')=='cheap' and not row['eligible'] else
+             ('Desconto patrimonial; confira qualidade e riscos do fundo.' if a['asset_type']=='fii' else 'Desconto com margem; confira os bloqueios de qualidade.') if reading.get('status')=='cheap' and not row['eligible'] else
              'Passou nos filtros; aporte limitado pela carteira e pelo número de destinos.' if row['eligible'] else
              'Há critérios a resolver antes de um novo aporte.')
     return dict(summary=summary,investor10=investor_link(a),decline=copy.deepcopy(observed),benchmark=copy.deepcopy(benchmark),

@@ -127,6 +127,14 @@ def models(cfg):
     return names[:100]
 
 
+def connection(app,d):
+    if not isinstance(d,dict) or set(d)-{'provider','base_url','model'}:raise ValueError('Informe somente a conexão local para testar.')
+    cfg,_=validate_settings(app,d);names=models(cfg)
+    selected=cfg['model'] or next((n for n in names if ':3b' in n.lower()),names[0])
+    return dict(provider=cfg['provider'],models=names,selected_model=selected,model_available=selected in names,
+        search_provider='Ollama Web Search / Web Fetch',note='A análise usa o servidor local. A busca web usa a chave Ollama, configurada separadamente; listar modelos não faz uma pesquisa paga nem altera suas preferências.')
+
+
 def generate(cfg, system, data, schema):
     available = [] if cfg['model'] else models(cfg)
     name = cfg['model'] or next((n for n in available if ':3b' in n.lower()), available[0])
@@ -935,6 +943,7 @@ def action(app, path, d):
             if key or d.get('clear_search_key'):
                 app.write_cache(c, 'ai_search_key', key)
         return {'ok': True}
+    if path == '/api/ai/connection':return connection(app,d)
     if path == '/api/ai/models':
         if d:
             raise ValueError('O teste usa a configuração salva, sem parâmetros.')

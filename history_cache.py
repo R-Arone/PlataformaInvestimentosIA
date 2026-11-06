@@ -47,9 +47,15 @@ def fetch(app,d):
 def observations(app,c,aid):
     """Accounting series by accounting date, not by the date the site was visited."""
     result={}
-    keys=('roe','net_debt_ebitda','debt_equity','roic','operating_cashflow')
-    for row in c.execute("SELECT kind,data,asof,source,retrieved_at FROM snapshots WHERE asset_id=? AND kind IN ('financial','public','risk','metric:roe','metric:net_debt_ebitda','metric:debt_equity','metric:roic','metric:operating_cashflow') ORDER BY id",(aid,)):
+    keys=('roe','net_debt_ebitda','debt_equity','roic','operating_cashflow','pe','pvp')
+    kinds=('financial','public','risk',*('metric:'+k for k in keys))
+    for row in c.execute('SELECT kind,data,asof,source,retrieved_at FROM snapshots WHERE asset_id=? AND kind IN ('+','.join('?' for _ in kinds)+') ORDER BY id',(aid,*kinds)):
         for k,v in json.loads(row['data']).items():
             if k in keys and isinstance(v,(int,float)) and not isinstance(v,bool):
                 result.setdefault(k,{})[row['asof']]={'date':row['asof'],'value':v,'source':row['source']}
+    for key in ('pe','pvp'):
+        if key in result:
+            months={}
+            for r in sorted(result[key].values(),key=lambda r:r['date']):months[r['date'][:7]]=r
+            result[key]=months
     return {k:sorted(v.values(),key=lambda p:p['date'])[-100:] for k,v in result.items()}
