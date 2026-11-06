@@ -145,3 +145,12 @@ Carteira e Analisar ativos voltam a mostrar nota de qualidade, preço de referê
 Em Aportar, **Atualizar indicadores** inclui juros brasileiros e americanos, inflação e commodities com data e frequência. **Analisar cenário atual** traz a leitura setorial para revisar o aporte. A pesquisa ampliada depende da chave de busca configurada e não envia posições ou valores. O contexto não altera automaticamente os pesos da alocação; a influência numérica dos modelos de preços é mostrada separadamente.
 
 O dossiê da empresa inclui relações com atrasos fixos, comparações descritivas de subida/queda, amostras e intervalos, sem selecionar o atraso mais favorável. Veja [método e limitações](LONGO_PRAZO.md).
+
+
+## Valor, setores e acessibilidade
+
+A lista e o aporte exibem **Barato com margem**, **Caro pelas premissas**, **Perto do valor estimado**, desconto sem margem ou valor inconclusivo, usando o método prioritário adequado ao negócio. FIIs mostram desconto/prêmio patrimonial; ETFs não recebem valor justo de empresa. As notas estruturais de setor são premissas qualitativas explicadas, separadas da qualidade da empresa.
+
+O contrafluxo fundamental passa a combinar 35% qualidade, 25% valor/desconto, 15% queda observada, 5% necessidade da classe, 10% setor e 10% diversificação. Considera os grupos setoriais equivalentes que já existem na carteira, produtos relacionados e pares com histórico comparável; o próximo destino reconsidera as compras já propostas. Mostra os pesos por setor antes/depois, preservando os limites sobre o dinheiro efetivamente investido. Sem histórico, a nota de correlação é neutra e a cobertura é informada. Veja o [método e as limitações](LONGO_PRAZO.md).
+
+Em **Configurações → Cores e acessibilidade**, ative o modo daltônico: azul para positivos, roxo para negativos, incluindo correlações e gráficos, com sinais e rótulos preservados. A preferência fica salva no banco local.

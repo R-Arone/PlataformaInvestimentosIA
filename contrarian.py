@@ -13,8 +13,10 @@ INDICATORS=('rates','us_rates','inflation','brent','iron','copper','soy','long_y
 IBOV='https://www.b3.com.br/pt_br/market-data-e-indices/indices/indices-amplos/ibovespa-b3.htm'
 BCB='https://dadosabertos.bcb.gov.br/dataset/1-taxa-de-cambio---livre---dolar-americano-venda---diario'
 IVVB=investment_exposure.CATALOG['IVVB11']['source_url']
-METHOD=('Contrafluxo: ações/FIIs usam 40% qualidade documentada, 30% desconto, 20% quedas relevantes '
-        'do ativo/mercado e 10% necessidade da classe (referência, sem bloquear classes acima da meta). '
+METHOD=('Contrafluxo: ações/FIIs usam 35% qualidade documentada, 25% valor/desconto pelo método aplicável, 15% quedas relevantes '
+        'do ativo/mercado, 5% necessidade da classe, 10% premissa estrutural do setor e 10% diversificação (referência, sem bloquear classes acima da meta). '
+        'Diversificação: 60% menor concentração/sobreposição setorial e 40% menor correlação positiva com posições existentes. '
+        'Sem nota setorial ou histórico comparável, usa componente neutro 50. A seleção de cada destino reconsidera as compras já propostas. '
         'Preserva qualidade, cobertura mínima, preço dentro do teto e limites de concentração. '
         'ETF amplo brasileiro ou IVVB11 com composição documentada usa 70% sinal de contrafluxo e 30% necessidade, '
         'sem nota de empresa ou valor justo inventados. Exige queda relevante, não apenas uma oscilação diária. '

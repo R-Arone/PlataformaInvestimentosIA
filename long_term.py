@@ -8,6 +8,8 @@ import investment_exposure
 import recommendation_signals
 import contrarian
 import market_research
+import investment_value
+import investment_risk
 
 
 REFERENCES = [
@@ -75,52 +77,11 @@ def issuer(asset):
 
 
 def sector(asset):
-    return str(asset.get('sector') or 'Não classificado').strip().casefold()
+    return investment_risk.group(asset)['key']
 
 
 def price_reference(app, asset, state):
-    quote = asset.get('snapshots', {}).get('quote', {})
-    price = quote.get('data', {}).get('price')
-    base = dict(price=price if numeric(price) and price > 0 else None,
-                quote_asof=quote.get('asof'), quote_source=quote.get('source', ''),
-                reference=None, ceiling=None, method=None, asof=None, discount=None, issues=[])
-    if base['price'] is None or not recent(app, quote.get('asof'), 7):
-        base['issues'].append('Cotação ausente, futura ou com mais de 7 dias.')
-    if asset.get('asset_type') == 'fii':
-        pvp, evidence, note = fii_quality.market_pvp(app, asset)
-        base.update(method='VPA de referência (P/VP 1; não é valor justo)', asof=evidence.get('asof'),
-                    evidence=note, pvp=pvp)
-        if pvp is None or base['price'] is None:
-            base['issues'].append('P/VP recente e positivo indisponível para comparar com o VPA.')
-        else:
-            base.update(reference=base['price']/pvp, ceiling=base['price']/pvp)
-            if not recent(app, evidence.get('asof'), 7) or evidence.get('asof', '')[:10] != str(quote.get('asof', ''))[:10]:
-                base['issues'].append('Confira P/VP e cotação na mesma data antes de derivar o VPA de referência.')
-            if pvp > 1.5: base['issues'].append('Descarte obrigatório: P/VP acima de 1,5.')
-            elif pvp >= 1: base['issues'].append('O FII não atende ao seu critério de P/VP abaixo de 1.')
-    elif asset.get('asset_type') == 'stock':
-        valuation = asset.get('valuation', {})
-        suggestion = valuation.get('suggestion', {})
-        saved = state.get('valuation_cases', {}).get(asset['ticker'], {})
-        base.update(reference=suggestion.get('value'), ceiling=suggestion.get('ceiling'),
-                    method=suggestion.get('method'), asof=saved.get('saved_at'),
-                    safety_margin=valuation.get('inputs', {}).get('safety_margin'))
-        if not recent(app, saved.get('saved_at'), 180):
-            base['issues'].append('Salve ou revise as premissas de avaliação; validade de 180 dias.')
-        chosen = next((r for r in valuation.get('methods', []) if r.get('method') == suggestion.get('method')), {})
-        if chosen.get('role') not in ('primary', 'complementary'):
-            base['issues'].append('Falta um método de avaliação aplicável ao negócio.')
-        if set(chosen.get('requirements', [])) & set(valuation.get('estimates', [])):
-            base['issues'].append('Confira as entradas estimadas por múltiplos antes de usar o preço de referência.')
-        if not all(numeric(base[k]) and base[k] > 0 for k in ('reference', 'ceiling')):
-            base['issues'].append('Falta valor de referência e teto positivos nas fórmulas do setor.')
-        elif base['price'] is not None and base['price'] > base['ceiling']:
-            base['issues'].append('Cotação acima do teto com a margem de segurança escolhida.')
-    else:
-        base['issues'].append('Esta versão compara qualidade e preço apenas de ações brasileiras e FIIs.')
-    if base['price'] is not None and numeric(base['reference']) and base['reference'] > 0:
-        base['discount'] = (1-base['price']/base['reference'])*100
-    return base
+    return investment_value.reference(app,asset,state.get('valuation_cases',{}))
 
 
 def context(app, asset, eligible):
@@ -162,7 +123,7 @@ def context(app, asset, eligible):
                      'A influência dos modelos de preços aparece separadamente no painel de IA; seus escores não são chances de lucro.')
 
 
-def candidate(app, asset, state, opts, budgets):
+def candidate(app, asset, state, opts, budgets, risk=None):
     allocation = state['allocation']
     item = next(r for r in allocation['items'] if r['key'] == 'asset:'+str(asset['id']))
     cls = item['class']; class_row = next(r for r in allocation['classes'] if r['key'] == cls)
@@ -206,7 +167,9 @@ def candidate(app, asset, state, opts, budgets):
     target = (class_row['target'] or 0)/100*(allocation['total']+opts['amount'])
     deficit = max(0, target-class_row['value'])
     need = min(100, deficit/target*100) if target and not opportunity else 0
-    discount = min(100, max(0, price.get('discount') or 0)/30*100)
+    discount = price['reading']['score'] if price['reading']['score'] is not None else 0
+    sector_rating=investment_risk.rating(asset)
+    diversification=risk.assess(asset['id']) if risk else None
     priority = round(.5*quality+.35*discount+.15*need, 2) if quality is not None else None
     observed=recommendation_signals.market(app,asset) if opportunity or contra or opts['mode']=='context' else None
     contraflow=contrarian.candidate(app,asset,state,observed) if contra else None
@@ -217,7 +180,8 @@ def candidate(app, asset, state, opts, budgets):
             priority=round(.7*contraflow['score']+.3*need,4)
             if not observed['available']:reasons.append(observed['reason'])
         elif fundamental and quality is not None:
-            priority=round(.4*quality+.3*discount+.2*contraflow['score']+.1*need,4)
+            priority=round(.35*quality+.25*discount+.15*contraflow['score']+.05*need+
+                .1*(sector_rating['score'] if sector_rating['score'] is not None else 50)+.1*(diversification['score'] if diversification else 50),4)
     if opportunity:
         priority=observed['score']
         if not observed['available']:reasons.append(observed['reason'])
@@ -238,14 +202,16 @@ def candidate(app, asset, state, opts, budgets):
                 quality=round(quality, 2) if quality is not None else None, coverage=round(coverage, 2),
                 counts=counts, failures=fails, pending=[c['label'] for c in checks+price_checks if c['status']=='unknown'],
                 previous_score=asset.get('analysis', {}).get('score'), priority=priority,
-                components=dict(quality=quality, discount=discount, rebalance=need,contraflow=contraflow['score'] if contra else None), price=price,
+                components=dict(quality=quality, discount=discount, rebalance=need,contraflow=contraflow['score'] if contra else None,
+                    sector=sector_rating['score'],diversification=diversification['score'] if diversification else None), price=price,
+                sector_rating=sector_rating,diversification=diversification,
                 market_signal=observed,ai=model,price_warnings=price_warnings,
                 contraflow=contraflow,
                 strategy='contrarian' if contra else 'opportunities' if opportunity else 'quality_value',
                 eligible=not reasons, reasons=list(dict.fromkeys(reasons)), amount=0, quantity=0)
 
 
-def allocate(state, rows, budgets, max_assets, min_ticket=0, available=None):
+def allocate(state, rows, budgets, max_assets, min_ticket=0, available=None, risk=None):
     """Whole units, cents, and caps recomputed on the actually invested portfolio.
 
     Start with the maximum possible invested denominator, then monotonically reduce
@@ -268,8 +234,15 @@ def allocate(state, rows, budgets, max_assets, min_ticket=0, available=None):
     for _ in range(300):
         remaining = dict(budgets); used_assets = dict(asset_values); used_sectors = dict(sector_values)
         total_room = money_cents(denominator-before, ROUND_FLOOR)
-        purchases = {}; seen = set()
-        for row in choices:
+        purchases = {}; seen = set();pending=list(choices)
+        while pending:
+            def selection_score(row):
+                if not risk or row['strategy']!='contrarian' or row['asset_type']=='etf':return row['priority'] or 0
+                values={i:float(v) for i,v in risk.values.items()}
+                for aid,(cents,_) in purchases.items():values[aid]+=cents/100
+                delta=risk.assess(row['id'],values)['score']-row['diversification']['score']
+                return row['priority']+.1*delta*(.7 if row['ai']['applied'] else 1)
+            row=max(pending,key=selection_score);pending.remove(row)
             key, group = row['issuer'], row['sector_key']
             if key in seen: continue
             unit = money_cents(row['price']['price'], ROUND_CEILING)
@@ -301,10 +274,13 @@ def allocate(state, rows, budgets, max_assets, min_ticket=0, available=None):
         row.update(amount=cents/100, quantity=quantity)
         if denominator > 0:
             row['after_issuer_weight'] = float(final_assets.get(row['issuer'], Decimal('0'))/denominator*100)
+            final_sector=sector_values.get(row['sector_key'],Decimal('0'))+sum(Decimal(c)/100 for aid,(c,_) in purchases.items() if sector(next(a for a in state['assets'] if a['id']==aid))==row['sector_key'])
+            row['after_sector_weight']=float(final_sector/denominator*100)
     return stable
 
 
-def suggestion(app, state, opts):
+def suggestion(app, state, opts, risk=None):
+    risk=risk or investment_risk.Plan(app,state)
     allocation=state['allocation']
     cents = money_cents(opts['amount'])
     opportunity=opts['allocation_style']=='opportunities'
@@ -313,7 +289,7 @@ def suggestion(app, state, opts):
     if allocation['has_targets']:
         _, ideal, _ = portfolio_strategy.distribution(allocation, {}, cents, app.number)
     order=lambda r:(not r['eligible'], -(r['priority'] if r['priority'] is not None else -1), r['ticker'])
-    seed=sorted((candidate(app,a,state,{**opts,'allocation_style':opts['allocation_style'] if flexible else 'balanced'},ideal) for a in state['assets']),key=order)
+    seed=sorted((candidate(app,a,state,{**opts,'allocation_style':opts['allocation_style'] if flexible else 'balanced'},ideal,risk) for a in state['assets']),key=order)
     selected=[];issuers=set()
     for row in seed:
         if not row['eligible'] or row['issuer'] in issuers:continue
@@ -323,8 +299,8 @@ def suggestion(app, state, opts):
     gradual=opts['allocation_style']=='gradual' and bool(selected)
     budgets=({key:cents for key in ideal} if flexible else
              {key:cents if key in selected else 0 for key in ideal} if gradual else dict(ideal))
-    rows=sorted((candidate(app,a,state,opts,budgets) for a in state['assets']),key=order)
-    stable = allocate(state, rows, budgets, opts['max_assets'],opts['min_ticket'],cents)
+    rows=sorted((candidate(app,a,state,opts,budgets,risk) for a in state['assets']),key=order)
+    stable = allocate(state, rows, budgets, opts['max_assets'],opts['min_ticket'],cents,risk)
     if opts['mode'] == 'context':
         lookup = {a['id']:a for a in state['assets']}
         for row in rows: row['context'] = context(app, lookup[row['id']], row['eligible'])
@@ -360,6 +336,7 @@ def suggestion(app, state, opts):
                 distance_after=(sum(abs(r['after_weight']-r['target']) for r in classes)+(cents-spent)/100/final_total*100)/2 if allocation['has_targets'] else None,
                 next_classes=[dict(key=r['key'],label=r['label'],gap=max(0,r['target']/100*final_total-r['value']-r['suggested'])) for r in classes if r['target'] is not None and r['after_weight']<r['target']-.01],
                 unassigned_weight=(cents-spent)/100/final_total*100, candidates=rows, classes=classes,
+                sector_allocation=risk.summary(rows),
                 warnings=warnings, references=REFERENCES,
                 method=(contrarian.METHOD if opts['allocation_style']=='contrarian' else recommendation_signals.METHOD if opportunity else METHOD+(' Com IA válida: 70% desta nota + 30% da média dos escores dos modelos locais no horizonte escolhido. Pesos experimentais.' if opts['mode']=='context' else '')),
                 generated_at=app.now(),
@@ -395,7 +372,8 @@ def recommend(app, data):
     if not allocation['has_targets'] and opts['allocation_style'] not in ('opportunities','contrarian'):raise ValueError('Salve suas metas ou selecione Contrafluxo ou Oportunidades de alta para usar metas apenas como referência.')
     if allocation['issues'] and not opts['accept_estimates']:
         raise ValueError('Atualize os saldos e classificações ou confirme o uso das estimativas da carteira.')
-    result=suggestion(app,state,opts)
+    risk=investment_risk.Plan(app,state)
+    result=suggestion(app,state,opts,risk)
     result['exposure_areas']=state.get('exposure_areas',[])
     result['market_context']=state.get('contribution_context',contrarian.public_state(app,{}))
     result['market_ideas']=contrarian.ideas(app,state,result['candidates'],opts['universe'])
@@ -406,10 +384,10 @@ def recommend(app, data):
     if allocation['has_targets']:scenarios.append(('balanced',20,'Distribuição proporcional'))
     for style,limit,label in scenarios:
         scenario_opts={**opts,'allocation_style':style,'max_assets':limit}
-        scenario=result if style==opts['allocation_style'] and limit==opts['max_assets'] else suggestion(app,state,scenario_opts)
+        scenario=result if style==opts['allocation_style'] and limit==opts['max_assets'] else suggestion(app,state,scenario_opts,risk)
         result['comparisons'].append(dict(label=label,allocation_style=style,max_assets=limit,invested=scenario['invested'],
             unassigned=scenario['unassigned'],distance_after=scenario['distance_after'],
             destinations=[dict(id=r['id'],ticker=r['ticker'],amount=r['amount'],quantity=r['quantity']) for r in scenario['candidates'] if r['amount']]))
-    baseline=suggestion(app,state,{**opts,'mode':'base'}) if opts['mode']=='context' else result
+    baseline=suggestion(app,state,{**opts,'mode':'base'},risk) if opts['mode']=='context' else result
     result['ai_effect']=ai_comparison(result,baseline)
     return result

@@ -43,6 +43,8 @@ import international_market
 import history_cache
 import portfolio_strategy
 import long_term
+import investment_value
+import investment_risk
 import contrarian
 import holdings
 import portfolio_coupling
@@ -79,7 +81,7 @@ DEFAULTS = {'profile': 'Longo prazo · maior tolerância a oscilações', 'asset
             'sector_limit': 40, 'equity_target': 60, 'risk_premium': 5,
             'sectors': [], 'auto_refresh': True, 'sector_rules': {},
             'allocation_targets':None,'allocation_overrides':{},'expensive_alert_percent':30,
-            'model_average_enabled':False}
+            'model_average_enabled':False,'color_mode':'standard'}
 
 
 def now():
@@ -472,6 +474,9 @@ def state():
             a['indicator_coverage']=sector_analysis.coverage(a,age)
             company_research.enrich(sys.modules[__name__],a)
             fii_research.enrich(sys.modules[__name__],a,c)
+            a['value_reading']=investment_value.reference(sys.modules[__name__],a,read_cache(c,'valuation_cases',{}))
+            a['sector_rating']=investment_risk.rating(a)
+            a['risk_group']=investment_risk.group(a)
             a.pop('_statement_metrics', None)
             a.pop('_fii_metrics', None)
         factor_analysis.enrich(sys.modules[__name__], assets)
@@ -1352,7 +1357,10 @@ def restore(c, d):
 def validate_settings(d):
     result = {}
     for k, v in d.items():
-        if k=='allocation_targets':result[k]=portfolio_strategy.targets(v,number)
+        if k=='color_mode':
+            if not isinstance(v,str) or v not in ('standard','accessible'):raise ValueError('Escolha cores padrão ou modo daltônico.')
+            result[k]=v
+        elif k=='allocation_targets':result[k]=portfolio_strategy.targets(v,number)
         elif k=='allocation_overrides':result[k]=portfolio_strategy.overrides(v)
         elif k in ('asset_limit', 'sector_limit', 'equity_target'):
             result[k] = number(v, True, 1 if k != 'equity_target' else 0, 100)
@@ -1778,6 +1786,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/long-term.js': ('long-term.js', 'application/javascript'),
                  '/navigation.js': ('navigation.js', 'application/javascript'),
                  '/research-dashboard.js': ('research-dashboard.js', 'application/javascript'),
+                 '/accessibility.js': ('accessibility.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),

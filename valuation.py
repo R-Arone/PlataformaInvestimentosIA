@@ -92,7 +92,8 @@ def apply_policy(result, selection):
             row.update(role='not_applicable', value=None, ceiling=None, premium=None, classification='unknown', price_gap=None)
     # Do not count equivalent stable RI and multistage RI as independent votes.
     eligible = [m for m in result['methods'] if m['role'] in ('primary','complementary') and m['value'] is not None]
-    available = {m['method']:m for m in eligible}
+    observed=[m for m in eligible if not set(m.get('requirements',[]))&set(result.get('estimates',[]))]
+    available = {m['method']:m for m in observed or eligible}
     chosen = next((available[n] for n in selection['primary'] if n in available), None)
     fallback = chosen is None
     chosen = chosen or next((available[n] for n in selection['complementary'] if n in available), None)
@@ -188,8 +189,8 @@ def for_asset(asset,saved,number,age):
             origins[field]={'source':'Estimativa pela cotação e '+metric.upper()+' publicado · '+m.get('source',''), 'asof':m.get('asof','')}
     inputs.setdefault('target_yield',6);inputs.setdefault('safety_margin',20)
     result=calculate(inputs,number)
-    apply_policy(result,policy(asset,result['inputs']))
     result.update(origins=origins,estimates=estimates,has_saved=bool(saved))
+    apply_policy(result,policy(asset,result['inputs']))
     result['basis_note']='Estimativas por múltiplos podem usar bases de preços diferentes: confira LPA, VPA e proventos no RI. DY é passado e não garante dividendos futuros. Campos vazios ficam sem cálculo.'
     result['data_plan'] = data_plan(result,origins,saved)
     result['field_catalog'] = {k:dict(label=v[0],min=v[1],max=v[2]) for k,v in FIELDS.items()}

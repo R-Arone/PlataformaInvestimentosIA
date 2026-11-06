@@ -9,9 +9,11 @@ function researchScore(a){
  const checks=(study?.groups||[]).filter(g=>g.key!=='price').flatMap(g=>g.checks||[]).filter(c=>c.status!=='na'&&c.scope!=='price');
  return checks.length?100*checks.filter(c=>c.status==='pass').length/checks.length:null;
 }
-function researchReference(a){const p=a.valuation?.suggestion,asof=S.valuation_cases?.[a.ticker]?.saved_at;
- return p?.value>0?`<b>${money(p.value)}</b><small>Teto: ${money(p.ceiling)} · ${dt(asof)}</small>`:'<span class="muted">Sem referência aplicável / premissas a conferir</span>';
+function researchReference(a){const p=a.value_reading,r=p?.reading;
+ if(!r)return '<span class="muted">Sem referência aplicável / premissas a conferir</span>';
+ return `${tag(esc(r.label),r.status==='cheap'?'good':r.status==='expensive'?'bad':'warn')}${p.reference>0?`<b>${money(p.reference)}</b><small>Teto: ${money(p.ceiling)} · ${esc(p.method)} · ${dt(p.asof)}</small>`:''}${r.disagreement?'<small>Métodos divergem; conferir premissas</small>':''}`;
 }
+function decisionSectorScore(a){const r=a.sector_rating;return r?.score!=null?button('sector-rating-open','Setor '+fmt(r.score,0)+'/100','text-button',`data-id="${a.id}"`)+`<small>${esc(r.label)} · premissa estrutural</small>`:'<small>Sem nota estrutural de setor aplicável</small>';}
 function researchFactors(a){
  const f=a.company_research?.factor_analysis;if(!f?.supported)return '<span class="muted">Critérios do produto</span>';
  const rows=(f.company||[]).filter(r=>['positive','negative'].includes(r.status)).map(r=>({key:r.key,text:r.label+' '+(r.status==='positive'?'↑':'↓')+' · mesmo mês'}));
@@ -27,7 +29,7 @@ function researchColumns(html){
   table.dataset.researchColumns='true';
   const head=$('thead tr',table);if(head)head.firstElementChild.insertAdjacentHTML('afterend','<th>Nota de qualidade</th><th>Preço de referência</th><th>Fatores associados</th>');
   for(const row of rows){const a=assetById($('[data-action=detail]',row).dataset.id);if(!a)continue;const score=researchScore(a);
-   row.firstElementChild.insertAdjacentHTML('afterend',`<td data-label="Nota de qualidade">${score===null?'—':fmt(score,0)+'/100'}<small>Critérios atendidos; pendências contam no total</small></td><td data-label="Preço de referência">${researchReference(a)}</td><td data-label="Fatores associados">${researchFactors(a)}</td>`);}
+   row.firstElementChild.insertAdjacentHTML('afterend',`<td data-label="Nota de qualidade">${score===null?'—':fmt(score,0)+'/100'}<small>Empresa / fundo · pendências contam no total</small>${decisionSectorScore(a)}</td><td data-label="Preço de referência">${researchReference(a)}</td><td data-label="Fatores associados">${researchFactors(a)}</td>`);}
  }
  return t.innerHTML;
 }
@@ -78,6 +80,10 @@ render=function(){researchRenderBefore();if(!S||document.body.classList.contains
 };
 
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;
+ if(b.dataset.action==='sector-rating-open'){
+  const a=assetById(b.dataset.id),r=a.sector_rating,g=a.risk_group,held=S.assets.filter(x=>x.risk_group?.key===g.key&&x.value>0),total=S.assets.reduce((s,x)=>s+x.value,0),value=held.reduce((s,x)=>s+x.value,0);
+  modal('Nota estrutural do setor · '+r.label,`<p><b>${fmt(r.score,0)}/100 · ${esc(r.assessment)}</b></p><p>${esc(r.note)}</p><div class="mini-stat"><b>Grupo de concentração: ${esc(g.label)}</b><p>${held.map(x=>esc(x.ticker)).join(' · ')||'Sem posição neste grupo'} · ${money(value)} · ${pct(total?value/total*100:0)} da carteira negociada. Limite: ${pct(S.settings.sector_limit)}.</p></div>${r.dimensions.map(d=>`<div class="mini-stat"><span>${esc(d.label)}</span><b>${d.value}/${d.maximum}</b></div>`).join('')}<ul>${r.risks.map(s=>`<li>${esc(s)}</li>`).join('')}</ul><p>A nota participa com 10% do contrafluxo de ações/FIIs. Sem nota aplicável, o componente é neutro (50); não substitui a avaliação da empresa.</p>${r.references.map(s=>`<p><a href="${esc(s.url)}" target="_blank" rel="noreferrer">${esc(s.title)} ↗</a></p>`).join('')}`);
+ }
  if(b.dataset.action==='factor-open'){const target=b.dataset.researchLag==='true'?'.research-lags':'.factor-analysis';$('#modal '+target)?.scrollIntoView({block:'start'});}
  if(b.dataset.action==='research-batch-open'){
   const choices=[['all','Toda a lista ('+S.assets.length+')'],['held','Só a carteira ('+S.assets.filter(a=>a.position.quantity>0).length+')'],['visible','Ativos do filtro atual ('+simpleAssets().length+')']];
@@ -91,3 +97,13 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');
 });
 
 document.addEventListener('change',e=>{if(e.target.form?.id==='research-market-form'&&e.target.name==='research'&&e.target.checked)e.target.form.elements.use_ai.checked=true;});
+
+const decisionCandidateBefore=longTermCandidate,decisionResultBefore=longTermResult;
+function decisionCorrelation(p){return `<span class="${p.correlation>=0?'positive':'negative'}">${p.correlation>=0?'+':''}${fmt(p.correlation,2)}</span>`;}
+longTermCandidate=function(r,index){
+ const t=document.createElement('template');t.innerHTML=decisionCandidateBefore(r,index);const root=t.content,d=r.diversification,s=r.sector_rating,v=r.price.reading;
+ const reference=$('.long-term-metrics>div:nth-child(3)',root);if(reference&&v)reference.insertAdjacentHTML('afterbegin',tag(esc(v.label),v.status==='cheap'?'good':v.status==='expensive'?'bad':'warn'));
+ if(d)$('.long-term-metrics',root)?.insertAdjacentHTML('afterend',`<div class="decision-risk-grid"><article><small>Nota estrutural do setor</small><b>${s?.score==null?'Sem nota aplicável':fmt(s.score,0)+'/100'}</b><p>${esc(s?.label||r.sector)} · ${esc(s?.assessment||'Conferir classificação')}</p>${s?.score!=null?button('sector-rating-open','Entender a nota do setor','text-button',`data-id="${r.id}"`):''}</article><article><small>Concentração e sobreposição</small><b>${pct(d.sector_weight)} → ${pct(r.after_sector_weight??d.sector_weight)}</b><p>${esc(d.group.label)} · limite de ${pct(S.settings.sector_limit)} da carteira negociada investida.</p><small>Produtos relacionados: ${pct(d.related_product_weight)} antes do aporte · ${d.related_products.map(esc).join(' · ')||'nenhum'}. Valores integrais dos produtos, sem pesos internos estimados.</small></article><article><small>${r.strategy==='contrarian'&&r.asset_type!=='etf'?'Diversificação na prioridade':'Diversificação · contexto e limites'}</small><b>${fmt(d.score,1)}/100</b><p>Cobertura da comparação histórica: ${pct(d.correlation_coverage)} do valor já investido.</p>${d.pairs.length?d.pairs.slice(0,2).map(p=>`<p>${esc(p.ticker)}: ${decisionCorrelation(p)} · ${p.n} retornos · ${dt(p.start)} a ${dt(p.end)}${p.correlation>=.75?' · aproximação elevada':''}</p>`).join(''):'<p>Sem pares comparáveis suficientes. Histórico ausente não comprova independência.</p>'}<small>${r.strategy==='contrarian'&&r.asset_type!=='etf'?'Nota antes do aporte; o próximo destino reconsidera as compras já propostas.':'Escore informativo neste método; limites de concentração continuam valendo.'} Correlação positiva: movimentos na mesma direção. Negativa: direções opostas. Relações podem mudar.</small></article></div>`);
+ return t.innerHTML.replace('40% qualidade + 30% desconto + 20% contrafluxo + 10% necessidade da classe.','35% qualidade + 25% valor/desconto + 15% contrafluxo + 5% necessidade da classe + 10% setor + 10% diversificação. A seleção reconsidera a sobreposição após cada destino proposto.');
+};
+longTermResult=function(p){const rows=p.sector_allocation||[];return decisionResultBefore(p)+(rows.length?`<section class="panel decision-sector-allocation"><h2>Como este aporte muda os setores</h2><p>Posições já existentes e compras sugeridas, sobre o valor efetivamente investido. O saldo a decidir não dilui concentração. Exposições equivalentes compartilham o limite; composição desconhecida de ETF fica sem rateio entre setores.</p><div class="table-wrap"><table><thead><tr><th>Grupo de risco</th><th>Já tenho</th><th>Peso antes</th><th>Aporte</th><th>Peso depois / limite</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${r.tickers.map(esc).join(' · ')||'Sem posição'}</td><td>${pct(r.before_weight)}</td><td>${money(r.contribution)}</td><td>${pct(r.after_weight)} / ${pct(r.limit)}${r.after_weight>r.limit+.001?' · posição existente acima do limite':''}</td></tr>`).join('')}</tbody></table></div></section>`:'');};
