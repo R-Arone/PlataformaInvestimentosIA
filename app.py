@@ -46,6 +46,7 @@ import long_term
 import investment_value
 import investment_risk
 import portfolio_review
+import quality_evidence
 import contrarian
 import holdings
 import portfolio_coupling
@@ -475,6 +476,7 @@ def state():
             a['indicator_coverage']=sector_analysis.coverage(a,age)
             company_research.enrich(sys.modules[__name__],a)
             fii_research.enrich(sys.modules[__name__],a,c)
+            a['quality_evidence']=quality_evidence.summarize(a.get('fii_research' if a['asset_type']=='fii' else 'company_research',{}).get('study',{}))
             a['value_reading']=investment_value.reference(sys.modules[__name__],a,read_cache(c,'valuation_cases',{}))
             a['sector_rating']=investment_risk.rating(a)
             a['risk_group']=investment_risk.group(a)
@@ -1795,6 +1797,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/completion.js': ('completion.js', 'application/javascript'),
                  '/aporte-cards.js': ('aporte-cards.js', 'application/javascript'),
                  '/valuation-choice.js': ('valuation-choice.js', 'application/javascript'),
+                 '/investment-context.js': ('investment-context.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),

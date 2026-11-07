@@ -3,13 +3,7 @@ const researchRenderBefore=render,researchRowsBefore=simpleAssetRows,researchTab
  researchDriversBefore=companyDriversPane,researchMarketBefore=longTermMarketPanel,researchResultBefore=longTermResult,researchPollBefore=aiPoll;
 let researchSeen='';
 
-function researchScore(a){
- if(!['stock','foreign','global_stock','fii'].includes(a.asset_type))return null;
- const study=a.fii_research?.study||a.company_research?.study;
- const checks=(study?.groups||[]).filter(g=>g.key!=='price').flatMap(g=>g.checks||[]).filter(c=>c.status!=='na'&&c.scope!=='price');
- const measured=checks.filter(c=>['pass','fail'].includes(c.status));
- return measured.length?100*measured.filter(c=>c.status==='pass').length/measured.length:null;
-}
+function researchScore(a){const q=qualityEvidence(a);return q.total?q.documented_score:null;}
 function researchCoverage(a){if(!['stock','foreign','global_stock','fii'].includes(a.asset_type))return 'Nota de empresa não aplicável';const s=a.fii_research?.study||a.company_research?.study,c=s?.counts;if(!c)return 'Sem critérios medidos';const total=c.pass+c.fail+c.unknown;return `${c.pass+c.fail}/${total} conhecidos · ${c.fail} negativos · ${c.unknown} sem dados`;}
 function researchReference(a){const p=a.value_reading,r=p?.reading;
  if(!r)return '<span class="muted">Sem referência aplicável / premissas a conferir</span>';
@@ -30,9 +24,9 @@ function researchColumns(html){
   if(table.dataset.researchColumns)continue;
   const rows=$$('tbody > tr',table).filter(r=>$('[data-action=detail][data-id]',r));if(!rows.length)continue;
   table.dataset.researchColumns='true';
-  const head=$('thead tr',table);if(head)head.firstElementChild.insertAdjacentHTML('afterend','<th>Nota de qualidade</th><th>Preço de referência</th><th>Fatores associados</th>');
+  const head=$('thead tr',table);if(head)head.firstElementChild.insertAdjacentHTML('afterend','<th>Evidência de qualidade</th><th>Preço de referência</th><th>Fatores associados</th>');
   for(const row of rows){const a=assetById($('[data-action=detail]',row).dataset.id);if(!a)continue;const score=researchScore(a);
-   row.firstElementChild.insertAdjacentHTML('afterend',`<td data-label="Nota de qualidade">${score===null?'—':fmt(score,0)+'/100'}<small>Critérios conhecidos · ${researchCoverage(a)}</small>${decisionSectorScore(a)}</td><td data-label="Preço de referência">${researchReference(a)}</td><td data-label="Fatores associados">${researchFactors(a)}</td>`);}
+   row.firstElementChild.insertAdjacentHTML('afterend',`<td data-label="Evidência de qualidade">${qualityEvidenceMarkup(a,true)}${decisionSectorScore(a)}</td><td data-label="Preço de referência">${researchReference(a)}</td><td data-label="Fatores associados">${researchFactors(a)}</td>`);}
  }
  return t.innerHTML;
 }

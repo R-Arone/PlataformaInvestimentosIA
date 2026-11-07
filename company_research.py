@@ -192,7 +192,7 @@ def inputs(app, a):
           'status':status,'profit':profit,'facts':facts,'untrusted_report_excerpt':report,'annual':annual}
     # Raw snapshot fingerprints work before factor enrichment as well, keeping
     # the saved qualitative reading stale when its supporting evidence changes.
-    evidence_kinds=('issuer_factor_history','issuer_factor_scope','issuer_profile','issuer_statements','stock_financials','issuer_model_assumptions','issuer_quality_facts')
+    evidence_kinds=('issuer_factor_history','issuer_factor_scope','issuer_profile','issuer_statements','stock_financials','issuer_model_assumptions','issuer_quality_facts','issuer_business_drivers')
     data['reference_hash']=hashlib.sha256(json.dumps({k:snaps[k]['data'] for k in evidence_kinds if k in snaps},sort_keys=True,ensure_ascii=False,allow_nan=False).encode()).hexdigest()
     digest=hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False,allow_nan=False).encode()).hexdigest()
     return data,digest
@@ -382,6 +382,9 @@ def start_initial(app):
 
 
 def action(app,path,d):
+    if path in ('/api/issuer/business','/api/issuer/business-review'):
+        import business_drivers
+        return business_drivers.review(app,d) if path.endswith('review') else market_ai.start(app,'business_drivers',d)
     if path in ('/api/issuer/complete','/api/issuer/completion-review'):
         import company_completion
         return market_ai.start(app,'issuer_completion',d) if path.endswith('/complete') else company_completion.review(app,d)

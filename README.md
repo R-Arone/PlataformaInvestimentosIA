@@ -160,7 +160,7 @@ Em **Configurações → Cores e acessibilidade**, ative o modo daltônico: cian
 
 Use **Completar dados das empresas** na lista ou **Completar dados faltantes** no checklist. O fluxo consulta os históricos públicos e pode pesquisar os campos restantes com IA local e busca configurada. Propostas têm trecho, fonte e período; podem ser editadas e revisadas em lote antes de entrar nos critérios. A marca **✦ Pesquisa IA** distingue origem revisada e alterações suas. Registros manuais são preservados e fontes indisponíveis continuam sinalizadas.
 
-A nota de qualidade agora mostra o resultado dos critérios conhecidos junto da cobertura: sem dados e critério negativo são situações diferentes. A prioridade de aporte mantém a base conservadora e os bloqueios. Nos fatores associados, positivo/negativo têm cores próprias; ausência de evidência fica neutra. O modo daltônico usa **ciano e roxo**, incluindo gráficos e correlações. Veja [método, fontes e limitações](LONGO_PRAZO.md).
+A qualidade destaca os critérios comprovados sobre o total aplicável, junto da cobertura: sem dados e critério negativo são situações diferentes. A prioridade de aporte mantém a base conservadora e os bloqueios. Nos fatores associados, positivo/negativo têm cores próprias; ausência de evidência fica neutra. O modo daltônico usa **ciano e roxo**, incluindo gráficos e correlações. Veja [método, fontes e limitações](LONGO_PRAZO.md).
 
 ## Aporte explicado e posições para revisar
 
@@ -175,3 +175,14 @@ Em **Aportar → Está barato?**, escolha Automático, Bazin, Graham ou outro m�
 **Preencher automaticamente** consulta fontes públicas e, quando configurada, a busca com IA. O cadastro CVM completa constituição jurídica e controle por CNPJ confirmado na B3; sugestões interpretativas vêm com trecho, fonte e marca ✦ para revisão em lote. Campos existentes são preservados.
 
 **Configurações → Ollama · pesquisa e análises** permite detectar modelos, escolher o modelo local e cadastrar a chave do Ollama Web Search. A análise roda pela conexão local; a busca na internet exige a chave da conta Ollama. As notas e os modelos estatísticos mantêm seus próprios cálculos. Veja [métodos e limitações](LONGO_PRAZO.md).
+
+
+## Integrações, cobertura e cenários no aporte
+
+**Integrações**, na barra superior, abre diretamente a configuração do Ollama, modelo local, chave de busca web e estado das fontes. A internet usa o Ollama Web Search / Web Fetch; a análise usa a conexão local configurada.
+
+A qualidade passa a destacar **critérios comprovados / total**, com cobertura e contagens separadas de atendidos, reprovados e sem informação. Três positivos em vinte critérios mostram **3/20 comprovados, cobertura 15%, análise inconclusiva**, sem sugerir 100% de segurança.
+
+**De que o negócio depende?** pesquisa por IA segmentos, crédito PF/PJ/agro, receitas, custos, dívida e insumos com fontes. Propostas operacionais podem ser editadas e revisadas; só as revisadas ponderam o contexto, independentemente da correlação da ação.
+
+Em Aportar, **Fundamentos + contexto econômico** e **Cenário de IA + fundamentos** ficam separados das regras e dos modelos de preços. A opção de cenário permite criar ou escolher uma hipótese salva, ajustar o peso e conferir a mudança da prioridade. Indicadores antigos ou exposições não revisadas não recebem pontos. Os filtros de compra e limites da carteira continuam. Veja [método, fontes e limites](LONGO_PRAZO.md).

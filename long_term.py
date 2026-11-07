@@ -11,6 +11,8 @@ import market_research
 import investment_value
 import investment_risk
 import investment_decision
+import contribution_context
+import quality_evidence
 
 
 REFERENCES = [
@@ -44,13 +46,13 @@ def money_cents(value, rounding=ROUND_HALF_UP):
 
 
 def options(app, data):
-    allowed = {'amount', 'mode', 'universe', 'max_assets', 'min_coverage', 'accept_estimates', 'allocation_style', 'min_ticket', 'signal_horizon'}
+    allowed = {'amount', 'mode', 'universe', 'max_assets', 'min_coverage', 'accept_estimates', 'allocation_style', 'min_ticket', 'signal_horizon','scenario_id','scenario_weight'}
     if not isinstance(data, dict) or set(data)-allowed:
         raise ValueError('Opções do aporte de longo prazo inválidas.')
     if isinstance(data.get('amount'), bool): raise ValueError('Informe o valor do aporte.')
     amount = app.number(data.get('amount'), True, .01, 1e12)
     mode, universe = data.get('mode', 'base'), data.get('universe', 'all')
-    if mode not in ('base', 'context') or universe not in ('all', 'held'):
+    if mode not in ('base', 'context','economic','scenario') or universe not in ('all', 'held'):
         raise ValueError('Escolha a versão e a lista de ativos.')
     style=data.get('allocation_style','gradual')
     if style not in ('gradual','balanced','opportunities','contrarian'):raise ValueError('Escolha contrafluxo, poucos destinos, proporcional ou oportunidades de alta.')
@@ -66,10 +68,15 @@ def options(app, data):
     coverage = app.number(coverage, True, 50, 100)
     if 'accept_estimates' in data and type(data['accept_estimates']) is not bool:
         raise ValueError('Confirme explicitamente o uso de saldos estimados.')
+    scenario_id=data.get('scenario_id','')
+    if not isinstance(scenario_id,str) or len(scenario_id)>64:raise ValueError('Escolha um cenário salvo.')
+    if mode=='scenario' and (len(scenario_id)!=64 or any(c not in '0123456789abcdef' for c in scenario_id)):raise ValueError('Escolha o cenário de IA para ponderar o aporte.')
+    if isinstance(data.get('scenario_weight',10),bool):raise ValueError('Peso do cenário inválido.')
+    scenario_weight=app.number(data.get('scenario_weight',10),True,0,20)
     return dict(amount=money_cents(amount)/100, mode=mode, universe=universe,
                 max_assets=int(limit), min_coverage=coverage,
                 allocation_style=style,min_ticket=money_cents(ticket)/100,signal_horizon=int(horizon),
-                accept_estimates=data.get('accept_estimates', False))
+                accept_estimates=data.get('accept_estimates', False),scenario_id=scenario_id,scenario_weight=scenario_weight)
 
 
 def issuer(asset):
@@ -197,11 +204,13 @@ def candidate(app, asset, state, opts, budgets, risk=None):
         elif not observed['positive'] and not (model['applied'] and model['score']>=60):
             reasons.append('Mercado sem alta consistente e sem sinal favorável de virada pelos modelos.')
     priority=model['final']
+    economic=contribution_context.evaluate(app,state,asset,opts,priority)
+    priority=economic['priority_after']
     return dict(id=asset['id'], ticker=asset['ticker'], name=asset['name'], asset_type=asset.get('asset_type'),
                 sector=asset.get('sector'), issuer=issuer(asset), sector_key=sector(asset),
                 class_key=cls, class_label=class_row['label'], held=item['held'], value=item['value'],
                 quality=round(quality, 2) if quality is not None else None, quality_known=round(counts['pass']/measured*100,2) if measured and quality is not None else None, coverage=round(coverage, 2),
-                counts=counts, failures=fails, pending=[c['label'] for c in checks+price_checks if c['status']=='unknown'],
+                counts=counts,quality_evidence=quality_evidence.summarize(study),economic_context=economic, failures=fails, pending=[c['label'] for c in checks+price_checks if c['status']=='unknown'],
                 previous_score=asset.get('analysis', {}).get('score'), priority=priority,
                 components=dict(quality=quality, discount=discount, rebalance=need,contraflow=contraflow['score'] if contra else None,
                     sector=sector_rating['score'],diversification=diversification['score'] if diversification else None), price=price,
@@ -370,6 +379,7 @@ def ai_comparison(result, baseline):
 
 def recommend(app, data):
     opts=options(app,data);state=app.state();allocation=state['allocation']
+    contribution_context.selected_scenario(app,state,opts)
     if not allocation['has_targets'] and opts['allocation_style'] not in ('opportunities','contrarian'):raise ValueError('Salve suas metas ou selecione Contrafluxo ou Oportunidades de alta para usar metas apenas como referência.')
     if allocation['issues'] and not opts['accept_estimates']:
         raise ValueError('Atualize os saldos e classificações ou confirme o uso das estimativas da carteira.')

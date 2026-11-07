@@ -5,6 +5,8 @@ Historical prices and present financial condition deliberately have separate rol
 """
 from datetime import date
 import math
+import business_drivers
+import quality_evidence
 
 EPISODES = (
     ('financial_2008', 'Crise financeira de 2008', '2007-09', '2007-10', '2009-06'),
@@ -62,6 +64,10 @@ def resilience(data):
 def context(a,day):
     research=a.get('company_research',{});model=research.get('fundamental_model',{})
     quality=model.get('quality',{});valuation=model.get('valuation',{});stress=model.get('stress',{})
+    study=research.get('study',{})
+    if study.get('groups'):
+        q=quality_evidence.summarize(study)
+        quality=dict(status='review' if q['fail'] else 'incomplete' if q['unknown'] or not q['total'] else 'within',counts={k:q[k] for k in ('pass','fail','unknown')}|{'na':0},checks=[c for g in study['groups'] if g['key']!='price' for c in g.get('checks',[])])
     factor=research.get('factor_analysis',{});parameters=model.get('parameters',{})
     scenarios=valuation.get('scenarios',[]);base=next((r for r in scenarios if r['label']=='Escolhido'),{})
     dates=[valuation.get(key,{}).get('asof') for key in ('observed_roe','observed_pvp')]
@@ -79,6 +85,9 @@ def context(a,day):
         c=r['company'];crises.append(dict(key=r['key'],label=r['label'],status=c['status'],drawdown=c.get('drawdown'),
             months_to_first=c.get('months_to_first'),months_to_confirm=c.get('months_to_confirm'),through=c.get('through')))
     facts=factor.get('scope',{}).get('facts',[])
+    age=lambda ref:(day-date.fromisoformat(str(ref)[:10])).days
+    operating=business_drivers.active(a,age)
+    facts=[dict(text=r['segment']+' · '+('participação '+str(r['share'])+'% · ' if r['share'] is not None else 'participação não documentada · ')+r['basis']+' · '+r['mechanism'],asof=r['asof'],source_url=r['source_url']) for r in operating]+facts
     return dict(asof=day.isoformat(),currency=factor.get('currency') or ('USD' if a.get('asset_type')=='foreign' else 'BRL'),
         quality=quality.get('status','incomplete'),quality_counts=quality.get('counts',{'pass':0,'fail':0,'unknown':0,'na':0}),
         failed_checks=[r['label'] for r in quality.get('checks',[]) if r['status']=='fail'][:8],

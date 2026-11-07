@@ -869,6 +869,9 @@ def start(app, kind, d):
         elif kind == 'issuer_completion':
             import company_completion
             inputs=company_completion.validate_request(app,d)
+        elif kind=='business_drivers':
+            import business_drivers
+            inputs=business_drivers.validate_request(app,d)
         elif kind == 'factor_ideas':
             import factor_analysis
             inputs = factor_analysis.validate_ideas_request(app,d)
@@ -903,6 +906,9 @@ def start(app, kind, d):
             elif kind == 'issuer_completion':
                 import company_completion
                 company_completion.run(app,inputs)
+            elif kind=='business_drivers':
+                import business_drivers
+                business_drivers.generate(app,inputs)
             elif kind == 'factor_ideas':
                 import factor_analysis
                 factor_analysis.generate_ideas(app,inputs)
