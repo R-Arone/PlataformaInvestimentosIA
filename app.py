@@ -41,6 +41,7 @@ import factor_analysis
 import fii_research
 import international_market
 import history_cache
+import multiple_history
 import portfolio_strategy
 import long_term
 import investment_value
@@ -73,7 +74,7 @@ REFRESH_LOCK = threading.Lock()
 PENDING_REFRESH = set()
 JOB = {'running': False, 'progress': '', 'errors': [], 'finished_at': None}
 CSV_PREVIEWS = {}
-KINDS = ('quote', 'statistics', 'financial', 'history', 'us_quote', 'us_history', 'risk', 'public')+company_research.KINDS+fii_research.KINDS+international_market.KINDS+stock_fundamentals.KINDS+tuple('metric:'+k for k in sector_analysis.METRICS)
+KINDS = ('quote', 'statistics', 'financial', 'history', 'us_quote', 'us_history', 'risk', 'public')+company_research.KINDS+fii_research.KINDS+international_market.KINDS+stock_fundamentals.KINDS+multiple_history.KINDS+tuple('metric:'+k for k in sector_analysis.METRICS)
 SNAPSHOT_FIELDS = {'quote': ('price', 'change'), 'statistics': ('pvp', 'pe', 'dy','nav','dividends_per_share','eps','bvps'),
                   'financial': ('roe', 'net_debt_ebitda', 'current_ratio', 'operating_margin',
                                 'operating_cashflow', 'free_cashflow', 'debt_equity', 'net_debt_equity', 'roic', 'interest_coverage','eps','bvps','payout'),
@@ -169,6 +170,15 @@ def init_db():
             amount REAL NOT NULL CHECK(amount>0), date TEXT NOT NULL, institution TEXT NOT NULL,
             amount_basis TEXT NOT NULL CHECK(amount_basis IN ('reported','net','gross')),
             notes TEXT NOT NULL DEFAULT '', source TEXT NOT NULL);
+          CREATE TABLE IF NOT EXISTS corporate_events (
+            id INTEGER PRIMARY KEY, asset_id INTEGER NOT NULL REFERENCES assets(id),
+            kind TEXT NOT NULL CHECK(kind IN ('split','grouping','bonus','fraction_out')),
+            date TEXT NOT NULL, institution TEXT NOT NULL DEFAULT 'Não informada',
+            quantity_delta REAL NOT NULL CHECK(quantity_delta<>0),
+            unit_cost REAL NOT NULL DEFAULT 0 CHECK(unit_cost>=0),
+            b3_quantity REAL NOT NULL DEFAULT 0 CHECK(b3_quantity>=0),
+            notes TEXT NOT NULL DEFAULT '', source TEXT NOT NULL);
+          CREATE INDEX IF NOT EXISTS idx_corporate_events_asset ON corporate_events(asset_id, date, id);
         ''')
         additions = {'assets': {'asset_type': "TEXT NOT NULL DEFAULT 'stock'", 'verified': 'INTEGER NOT NULL DEFAULT 0',
                                'research_profile': "TEXT NOT NULL DEFAULT 'auto'", 'archived':'INTEGER NOT NULL DEFAULT 0',
@@ -262,12 +272,40 @@ def settings(c):
     return {r['key']: json.loads(r['value']) for r in c.execute('SELECT * FROM settings')}
 
 
+def ledger_order(t):
+    """Corporate events take effect before same-day trades; trades keep their date/id order."""
+    return (t['date'], 0 if 'quantity_delta' in t else 1, t['id'])
+
+
+def asset_events(c, asset_id):
+    return [dict(r) for r in c.execute('SELECT * FROM corporate_events WHERE asset_id=? ORDER BY date,id', (asset_id,))]
+
+
+def asset_ledger(c, asset_id):
+    """Trades plus corporate events, the full input of position()."""
+    return [dict(t) for t in c.execute('SELECT * FROM trades WHERE asset_id=?', (asset_id,))] + asset_events(c, asset_id)
+
+
 def position(trades):
     pools = {}
-    for t in sorted(trades, key=lambda x: (x['date'], x['id'])):
+    for t in sorted(trades, key=ledger_order):
         bank = t.get('institution') or 'Não informada'
         pool = pools.setdefault(bank, {'institution': bank, 'quantity': 0.0, 'cost': 0.0, 'realized': 0.0})
         qty, cost, realized = pool['quantity'], pool['cost'], pool['realized']
+        if 'quantity_delta' in t:
+            # Splits, groupings and bonus shares change quantity without a trade; fractions leave at average cost.
+            delta = t['quantity_delta']
+            if qty + delta < -1e-9:
+                raise ValueError('Um evento corporativo reduz mais do que a posição disponível nessa data.')
+            if t['kind'] == 'fraction_out':
+                cost -= -delta * (cost / qty if qty else 0)
+            elif delta > 0:
+                cost += delta * t.get('unit_cost', 0)
+            qty += delta
+            if qty < 1e-12:
+                qty = cost = 0.0
+            pool.update(quantity=qty, cost=cost, realized=realized, average=cost/qty if qty else 0)
+            continue
         q, p, f = t['quantity'], t['price'], t['fees']
         if t['side'] == 'buy':
             qty += q
@@ -414,7 +452,8 @@ def state():
             openings={r['record_id'] for r in c.execute("SELECT record_id FROM imported_rows WHERE kind='positions'")}
             for t in a['trades']:
                 if t['id'] in openings:t['opening']=True
-            a['position'] = position(a['trades'])
+            a['corporate_events'] = asset_events(c, a['id'])
+            a['position'] = position(a['trades'] + a['corporate_events'])
             a['provider_references']=read_cache(c,'provider_references',{}).get(str(a['id']),[])
             a['snapshots'] = latest(c, a['id'])
             us_market.enrich(sys.modules[__name__],c,a)
@@ -423,7 +462,7 @@ def state():
             a['history_info']=history_cache.info(a['snapshots'].get('history'))
             a['fundamental_history']=history_cache.observations(__import__(__name__),c,a['id'])
             for kind, snapshot in a['snapshots'].items():
-                if kind in company_research.KINDS+fii_research.KINDS:
+                if kind in company_research.KINDS+fii_research.KINDS+multiple_history.KINDS:
                     snapshot['url'] = snapshot['data'].get('source_url') or snapshot['data'].get('url') or ''
                 elif kind in stock_fundamentals.KINDS:
                     snapshot['url']=snapshot['data']['source_url']
@@ -470,6 +509,7 @@ def state():
             if critical:
                 a['analysis']['score']=None
                 a['analysis']['problems'] += ['Revisar critério por setor: '+r['label'] for r in critical]
+            a['multiple_history']=multiple_history.analyze(a,age,today())
             if a['asset_type']=='stock':
                 a['valuation']=valuation.for_asset(a,read_cache(c,'valuation_cases',{}).get(a['ticker'],{}),number,age)
                 a['valuation_alert']=valuation.alert(a,cfg['expensive_alert_percent'])
@@ -1143,18 +1183,18 @@ def projection(d):
 
 
 def export_data(c):
-    tables = {t: [dict(r) for r in c.execute('SELECT * FROM ' + t)] for t in ('assets', 'trades', 'snapshots', 'fixed', 'macro', 'imported_rows', 'income')}
+    tables = {t: [dict(r) for r in c.execute('SELECT * FROM ' + t)] for t in ('assets', 'trades', 'snapshots', 'fixed', 'macro', 'imported_rows', 'income', 'corporate_events')}
     tables['settings'] = [dict(r) for r in c.execute("SELECT * FROM settings WHERE key != 'brapi_token'")]
     tables['sentiment'] = [dict(r) for r in c.execute('SELECT * FROM sentiment')]
     entities={'asset:'+a['ticker'] for a in tables['assets']}|{'fund:'+str(f['id']) for f in tables['fixed'] if investment_exposure.is_fund(f)}
     exposures={k:v for k,v in read_cache(c,'investment_exposures',{}).items() if k in entities}
-    return {'format': 'aporte-brasil-v6', 'exported_at': now(), 'tables': tables,'research_reports':read_cache(c,'research_reports',[]),'valuation_cases':read_cache(c,'valuation_cases',{}),'import_receipts':read_cache(c,'import_receipts',[]),'news_scenarios':read_cache(c,'news_scenarios',{}),'ai_scenarios':read_cache(c,'ai_scenarios',[]),'investment_exposures':exposures}
+    return {'format': 'aporte-brasil-v7', 'exported_at': now(), 'tables': tables,'research_reports':read_cache(c,'research_reports',[]),'valuation_cases':read_cache(c,'valuation_cases',{}),'import_receipts':read_cache(c,'import_receipts',[]),'news_scenarios':read_cache(c,'news_scenarios',{}),'ai_scenarios':read_cache(c,'ai_scenarios',[]),'investment_exposures':exposures}
 
 
 def restore(c, d):
     if JOB['running'] or market_ai.job_state()['running'] or market_signals.job_state()['running']:
         raise ValueError('Aguarde a atualização de mercado e a análise de IA antes de restaurar.')
-    if d.get('format') not in ('aporte-brasil-v1', 'aporte-brasil-v2', 'aporte-brasil-v3', 'aporte-brasil-v4','aporte-brasil-v5','aporte-brasil-v6') or not isinstance(d.get('tables'), dict):
+    if d.get('format') not in ('aporte-brasil-v1', 'aporte-brasil-v2', 'aporte-brasil-v3', 'aporte-brasil-v4','aporte-brasil-v5','aporte-brasil-v6','aporte-brasil-v7') or not isinstance(d.get('tables'), dict):
         raise ValueError('Use um backup exportado por este aplicativo.')
     tables = d['tables']
     for a in tables.get('assets', []):
@@ -1185,7 +1225,8 @@ def restore(c, d):
         for flag in ('invested_known','conditions_known','archived'):
             if f[flag] not in (0,1): raise ValueError('Campo de investimento inválido.')
     tables.setdefault('income', [])
-    expected = ('assets', 'trades', 'snapshots', 'fixed', 'macro', 'settings', 'income')
+    tables.setdefault('corporate_events', [])
+    expected = ('assets', 'trades', 'snapshots', 'fixed', 'macro', 'settings', 'income', 'corporate_events')
     for t in expected:
         if not isinstance(tables.get(t), list) or len(tables[t]) > 100000:
             raise ValueError('Backup inválido ou muito grande.')
@@ -1197,6 +1238,9 @@ def restore(c, d):
         validate_income(r)
     for f in tables['fixed']:
         validate_fixed(f)
+    asset_ids = {a['id'] for a in tables['assets']}
+    for e in tables['corporate_events']:
+        validate_corporate_event(e, asset_ids)
     for t in tables['trades']:
         number(t['quantity'], True, .00000001)
         number(t['price'], True, .00000001)
@@ -1225,6 +1269,11 @@ def restore(c, d):
                 raise ValueError('Listagem internacional não corresponde ao ativo do backup.')
             if s['kind']=='international_quote' and payload['instrument_type']!=('ETF' if owner['asset_type']=='global_etf' else 'EQUITY'):
                 raise ValueError('Tipo de cotação internacional não corresponde ao cadastro.')
+        elif s['kind'] in multiple_history.KINDS:
+            payload=multiple_history.validate_snapshot(sys.modules[__name__],payload)
+            owner=next((a for a in tables['assets'] if a['id']==s['asset_id']),None)
+            if not owner or owner['asset_type'] not in ('stock','fii') or payload['symbol']!=owner['ticker']+'.SA':
+                raise ValueError('Histórico de preços não corresponde ao ativo do backup.')
         elif s['kind'] in fii_research.KINDS:
             payload=fii_research.validate_snapshot(sys.modules[__name__],s['kind'],payload)
             owner=next((a for a in tables['assets'] if a['id']==s['asset_id']),None)
@@ -1319,7 +1368,7 @@ def restore(c, d):
         valuation.calculate(case['inputs'],number);text_value(case['saved_at'],100,True)
     # Retain a real SQLite backup before replacing the portfolio.
     backup_db(c,'antes-restauracao-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
-    for t in ('trades', 'snapshots', 'assets', 'fixed', 'macro', 'income'):
+    for t in ('trades', 'corporate_events', 'snapshots', 'assets', 'fixed', 'macro', 'income'):
         c.execute('DELETE FROM ' + t)
     c.execute('DELETE FROM imported_rows')
     c.execute('DELETE FROM sentiment')
@@ -1347,14 +1396,14 @@ def restore(c, d):
     for key,empty in (('news_reports',{}),('news_macro_context',{}),('news_context_profiles',[]),('ai_sentiment',{}),('us_news',{}),('market_signal_models',{}),('market_signal_results',{})):
         write_cache(c,key,empty)
     for a in tables['assets']:
-        position([t for t in tables['trades'] if t['asset_id'] == a['id']])
+        position([t for t in tables['trades'] if t['asset_id'] == a['id']] + [e for e in tables['corporate_events'] if e['asset_id'] == a['id']])
     c.execute('UPDATE assets SET verified=CASE WHEN ticker="BTC" OR ticker IN (SELECT ticker FROM catalog) THEN 1 ELSE 0 END')
     c.execute('UPDATE assets SET asset_type=(SELECT asset_type FROM catalog WHERE catalog.ticker=assets.ticker) WHERE ticker IN (SELECT ticker FROM catalog)')
     for r in tables.get('imported_rows', []):
-        if r.get('kind') not in ('positions','trades','fixed','watchlist','b3_trades','b3_fixed','income') or not re.fullmatch('[a-f0-9]{64}',r.get('fingerprint','')):
+        if r.get('kind') not in ('positions','trades','fixed','watchlist','b3_trades','b3_fixed','income','b3_events') or not re.fullmatch('[a-f0-9]{64}',r.get('fingerprint','')):
             raise ValueError('Registro de importação inválido no backup.')
         rid = int(r['record_id'])
-        target = {'positions':'trades','trades':'trades','fixed':'fixed','watchlist':'assets','b3_trades':'trades','b3_fixed':'fixed','income':'income'}[r['kind']]
+        target = {'positions':'trades','trades':'trades','fixed':'fixed','watchlist':'assets','b3_trades':'trades','b3_fixed':'fixed','income':'income','b3_events':'corporate_events'}[r['kind']]
         if c.execute('SELECT 1 FROM '+target+' WHERE id=?',(rid,)).fetchone():
             c.execute('INSERT INTO imported_rows VALUES (?,?,?,?)',(r['fingerprint'],r['kind'],rid,text_value(r['created_at'],100)))
     for k, v in DEFAULTS.items():
@@ -1451,14 +1500,24 @@ def mutate(path, d):
             institution = text_value(d.get('institution') or 'Não informada', 150, True)
             holdings.ensure_after_opening(c,aid,institution,dt)
             c.execute('INSERT INTO trades(asset_id,side,quantity,price,fees,date,institution) VALUES (?,?,?,?,?,?,?)', (aid, side, q, p, fee, dt, institution))
-            position([dict(t) for t in c.execute('SELECT * FROM trades WHERE asset_id=?', (aid,))])
+            position(asset_ledger(c, aid))
         elif path == '/api/trades/delete':
             r = c.execute('SELECT asset_id FROM trades WHERE id=?', (int(d['id']),)).fetchone()
             if not r:
                 raise ValueError('Operação não encontrada.')
             c.execute('DELETE FROM trades WHERE id=?', (int(d['id']),))
             c.execute('DELETE FROM imported_rows WHERE kind IN ("trades","positions","b3_trades") AND record_id=?', (int(d['id']),))
-            position([dict(t) for t in c.execute('SELECT * FROM trades WHERE asset_id=?', (r['asset_id'],))])
+            position(asset_ledger(c, r['asset_id']))
+        elif path == '/api/corporate-events/delete':
+            r = c.execute('SELECT asset_id FROM corporate_events WHERE id=?', (int(d['id']),)).fetchone()
+            if not r:
+                raise ValueError('Evento corporativo não encontrado.')
+            c.execute('DELETE FROM corporate_events WHERE id=?', (int(d['id']),))
+            c.execute('DELETE FROM imported_rows WHERE kind="b3_events" AND record_id=?', (int(d['id']),))
+            try:
+                position(asset_ledger(c, r['asset_id']))
+            except ValueError:
+                raise ValueError('Sem esse evento, vendas posteriores ficariam maiores que a posição. Revise as operações depois do evento antes de excluí-lo.') from None
         elif path == '/api/manual':
             aid = int(d['asset_id'])
             ref = valid_date(d.get('asof'))
@@ -1608,6 +1667,21 @@ def validate_url(v):
     if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError('Use um link http ou https sem credenciais.')
     return v
+
+
+def validate_corporate_event(e, asset_ids):
+    fields = {'id','asset_id','kind','date','institution','quantity_delta','unit_cost','b3_quantity','notes','source'}
+    if not isinstance(e, dict) or set(e) != fields or e['asset_id'] not in asset_ids:
+        raise ValueError('Evento corporativo inválido no backup.')
+    if e['kind'] not in ('split','grouping','bonus','fraction_out') or isinstance(e['quantity_delta'], bool):
+        raise ValueError('Evento corporativo inválido no backup.')
+    if valid_date(e['date']) > today().isoformat():
+        raise ValueError('Evento corporativo com data futura.')
+    delta = number(e['quantity_delta'], True)
+    if not delta or e['kind'] in ('split','bonus') and delta < 0 or e['kind'] == 'fraction_out' and delta > 0:
+        raise ValueError('Quantidade de evento corporativo inválida no backup.')
+    number(e['unit_cost'], True, 0); number(e['b3_quantity'], True, 0)
+    text_value(e['institution'], 150, True); text_value(e['notes'], 1000); text_value(e['source'], 300, True)
 
 
 def validate_income(d):
@@ -1797,7 +1871,9 @@ class Handler(BaseHTTPRequestHandler):
                  '/completion.js': ('completion.js', 'application/javascript'),
                  '/aporte-cards.js': ('aporte-cards.js', 'application/javascript'),
                  '/valuation-choice.js': ('valuation-choice.js', 'application/javascript'),
+                 '/multiples.js': ('multiples.js', 'application/javascript'),
                  '/investment-context.js': ('investment-context.js', 'application/javascript'),
+                 '/b3-sync.js': ('b3-sync.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),
@@ -1886,6 +1962,7 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith('/api/issuer/'): return self.respond(company_research.action(sys.modules[__name__],path,d))
             if path.startswith('/api/fii/'): return self.respond(fii_research.action(sys.modules[__name__],path,d))
             if path in ('/api/research/template','/api/research/preview','/api/research/commit'):return self.respond(research_exchange.action(__import__(__name__),path,d))
+            if path=='/api/multiples/history':return self.respond(multiple_history.action(sys.modules[__name__],d))
             if path=='/api/valuation':
                 result=valuation.calculate(d,number)
                 selected=next((a for a in state()['assets'] if a['id']==d.get('asset_id')),None)
@@ -1919,6 +1996,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/b3/preview':
                 import b3_import
                 return self.respond(b3_import.preview(__import__(__name__), d))
+            if path == '/api/b3/position-check':
+                import b3_position
+                return self.respond(b3_position.check(__import__(__name__), d))
             if path == '/api/signals/analyze':return self.respond(market_signals.start(__import__(__name__),d))
             if path == '/api/allocation/plan':return self.respond(portfolio_strategy.plan(__import__(__name__),d))
             if path == '/api/allocation/recommend':return self.respond(long_term.recommend(__import__(__name__),d))

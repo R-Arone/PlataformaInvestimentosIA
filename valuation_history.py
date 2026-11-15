@@ -2,6 +2,8 @@
 import math
 import statistics
 
+import multiple_history
+
 METHODS={'P/L histórico':('pe','eps'),'P/VP histórico':('pvp','bvps')}
 
 
@@ -22,6 +24,9 @@ def series(asset,key,age):
 def attach(result,asset,age):
     stat=result['inputs'].get('historical_stat','mean');margin=result['inputs']['safety_margin'];price=result['inputs']['price']
     histories={key:series(asset,key,age) for key,_ in METHODS.values()}
+    for key in histories:
+        # Sparse consulted observations fall back to the monthly series rebuilt from prices and statements.
+        if not histories[key]['available']:histories[key]=multiple_history.valuation_series(asset,key) or histories[key]
     result['historical_multiples']=histories
     for name,(key,base) in METHODS.items():
         h=histories[key];value=result['inputs'].get(base);multiple=h[stat]

@@ -11,6 +11,7 @@ import re
 import time
 import zipfile
 import treasury_import
+import corporate_events
 from xml.etree import ElementTree as ET
 from csv_import import key, decimal, fingerprint
 
@@ -130,7 +131,7 @@ def find_header(sheet):
 
 def revision(c):
     import hashlib,json
-    return hashlib.sha256(json.dumps({t:[dict(r) for r in c.execute('SELECT * FROM '+t+' ORDER BY id')] for t in ('assets','trades','fixed','income')},sort_keys=True).encode()).hexdigest()
+    return hashlib.sha256(json.dumps({t:[dict(r) for r in c.execute('SELECT * FROM '+t+' ORDER BY id')] for t in ('assets','trades','fixed','income','corporate_events')},sort_keys=True).encode()).hexdigest()
 
 class ReconciliationError(ValueError):
     def __init__(self,issues):
@@ -142,15 +143,17 @@ class ReconciliationError(ValueError):
 
 def balance_issues(trades,ticker,kind,locations=None):
     """Diagnose the missing opening quantity; never infer its cost or add it."""
-    locations=locations or {};pools={};issues={};ordered=sorted(trades,key=lambda t:(t['date'],t['id']))
+    locations=locations or {};pools={};issues={};ordered=sorted(trades,key=lambda t:(t['date'],0 if 'quantity_delta' in t else 1,t['id']))
     for t in ordered:
         bank=t.get('institution') or 'Não informada';q=pools.get(bank,0)
+        if 'quantity_delta' in t:
+            pools[bank]=q+t['quantity_delta'];continue
         after=q+(t['quantity'] if t['side']=='buy' else -t['quantity'])
         if after < -1e-12:
             if bank not in issues:
                 issues[bank]={'ticker':ticker,'record_type':kind,'institution':bank,'date':t['date'],
                     'sold':t['quantity'],'available':q,'required_quantity':-after,
-                    'first_date':min(x['date'] for x in ordered if (x.get('institution') or 'Não informada')==bank),
+                    'first_date':min(x['date'] for x in ordered if (x.get('institution') or 'Não informada')==bank and 'quantity_delta' not in x),
                     'other_institutions':[{'institution':b,'quantity':v} for b,v in pools.items() if b!=bank and v>0],
                     **locations.get(t['id'],{'sheet':'Histórico já salvo','line':None})}
             issues[bank]['required_quantity']=max(issues[bank]['required_quantity'],-after)
@@ -202,12 +205,13 @@ def opening_rows(app,c,request,rows):
     return result
 
 def apply(app,c,rows):
-    added=skipped=0; changed=set(); previous={}; fixed_previous={}; fixed_changed=set();locations={};fixed_locations={}
-    # B3 does not provide execution times in these layouts; purchases are ordered first on the same day.
-    for item in sorted(rows,key=lambda r:(r['data']['date'],r['data'].get('side')=='sell',r['line'])):
+    added=skipped=0; changed=set(); previous={}; fixed_previous={}; fixed_changed=set();locations={};fixed_locations={};event_changes=[]
+    # B3 does not provide execution times in these layouts; corporate events come first, then purchases before sales on the same day.
+    order=lambda r:(r['data']['date'],0 if r['kind']=='event' else 1,corporate_events.ORDER.get(r['data'].get('event'),0),r['data'].get('side')=='sell',r['line'])
+    for item in sorted(rows,key=order):
         r=item['data']; fp=item['fingerprint']; typ=item['kind']
         if c.execute('SELECT 1 FROM imported_rows WHERE fingerprint=?',(fp,)).fetchone(): skipped+=1; continue
-        if typ=='trades':
+        if typ in ('trades','event'):
             found=c.execute('SELECT id FROM assets WHERE ticker=?',(r['ticker'],)).fetchone()
             if found: aid=found['id']
             else:
@@ -218,11 +222,15 @@ def apply(app,c,rows):
             if not item.get('opening'):
                 cutoff=c.execute("SELECT MAX(t.date) AS date FROM trades t JOIN imported_rows i ON i.record_id=t.id AND i.kind='positions' WHERE t.asset_id=? AND t.institution=?",(aid,r['institution'])).fetchone()['date']
                 if cutoff and r['date']<=cutoff:raise ValueError(r['ticker']+' · '+r['institution']+': já existe saldo inicial em '+cutoff+'. Não some operações anteriores a esse saldo; revise o histórico inicial primeiro.')
-            if aid not in previous: previous[aid]=app.position([dict(t) for t in c.execute('SELECT * FROM trades WHERE asset_id=?',(aid,))])
+            if aid not in previous: previous[aid]=app.position(app.asset_ledger(c,aid))
+            changed.add(aid)
+            if typ=='event':
+                rid,change=corporate_events.apply(app,c,aid,item);event_changes.append(change)
+                c.execute('INSERT INTO imported_rows VALUES (?,?,?,?)',(fp,'b3_events',rid,app.now())); added+=1
+                continue
             rid=c.execute('INSERT INTO trades(asset_id,side,quantity,price,fees,date,institution) VALUES (?,?,?,?,?,?,?)',
                           (aid,r['side'],r['quantity'],r['price'],r['fees'],r['date'],r['institution'])).lastrowid
             locations[rid]={'sheet':item['sheet'],'line':item['line']}
-            changed.add(aid)
         elif typ in ('treasury','bank_fixed'):
             ident=(r['ticker'],r['institution'])
             if ident not in fixed_previous:
@@ -241,8 +249,7 @@ def apply(app,c,rows):
     issues=[]
     for aid in sorted(changed):
         ticker=c.execute('SELECT ticker FROM assets WHERE id=?',(aid,)).fetchone()['ticker']
-        trades=[dict(r) for r in c.execute('SELECT * FROM trades WHERE asset_id=?',(aid,))]
-        issues+=balance_issues(trades,ticker,'trades',locations)
+        issues+=balance_issues(app.asset_ledger(c,aid),ticker,'trades',locations)
     for ident in sorted(fixed_changed):
         f=c.execute('SELECT metadata FROM fixed WHERE upper(name)=? AND institution=?',ident).fetchone()
         metadata=json.loads(f['metadata']);kind='bank_fixed' if 'bank_fixed' in metadata else 'treasury'
@@ -251,7 +258,7 @@ def apply(app,c,rows):
     positions=[]
     for aid in sorted(changed):
         try:
-            pos=app.position([dict(r) for r in c.execute('SELECT * FROM trades WHERE asset_id=?',(aid,))])
+            pos=app.position(app.asset_ledger(c,aid))
             positions.append({'ticker':c.execute('SELECT ticker FROM assets WHERE id=?',(aid,)).fetchone()['ticker'],'before':previous[aid], 'after':pos})
         except ValueError as exc:
             raise ValueError(str(exc)+' O Excel pode não incluir compras antigas ou pode conter transferências. Cadastre a posição anterior na mesma instituição, ou revise o período do extrato.')
@@ -259,7 +266,7 @@ def apply(app,c,rows):
         f=c.execute('SELECT id FROM fixed WHERE upper(name)=? AND institution=?',ident).fetchone()
         pos=treasury_import.recalculate(app,c,f['id'])
         positions.append({'ticker':ident[0], 'institution':ident[1], 'before':fixed_previous[ident],'after':pos})
-    return {'added':added,'updated':0,'skipped':skipped,'position_changes':positions}
+    return {'added':added,'updated':0,'skipped':skipped,'position_changes':positions,'corporate_events':event_changes}
 
 def preview(app,d):
     sheets=read_xlsx(d.get('xlsx','')) if d.get('xlsx') else read_csv(d.get('csv',''))
@@ -279,13 +286,15 @@ def preview(app,d):
         historical[ticker]={'name':values[1],'sector':values[2],'financial':values[3],'notes':'Cadastro histórico confirmado na importação B3. Código original mantido; sem conversão ou verificação automática.','asset_type':values[5]}
     if not isinstance(d.get('skip_unknown',False),bool): raise ValueError('Opção de exclusão inválida.')
     if not isinstance(d.get('skip_invalid',False),bool): raise ValueError('Opção de exclusão inválida.')
+    if not isinstance(d.get('skip_events',False),bool): raise ValueError('Opção de eventos corporativos inválida.')
+    event_inputs=d.get('event_inputs',{})
     institution_map=d.get('institution_map',{})
     if not isinstance(institution_map,dict) or len(institution_map)>200:raise ValueError('Nomes de instituições inválidos.')
     institution_map={app.text_value(k,150,True):app.text_value(v,150,True) for k,v in institution_map.items()}
     raw=base64.b64decode(d['xlsx']) if d.get('xlsx') else d.get('csv','').encode('utf-8')
     file_hash=hashlib.sha256(raw).hexdigest()
     filename=app.text_value(d.get('filename','Arquivo B3'),200,True)
-    rows=[]; errors=[]; error_details=[]; ignored=[]; mappings=[]; headers_out=[]; unknown={};institutions=Counter();balance_problems=[]
+    rows=[]; errors=[]; error_details=[]; ignored=[]; mappings=[]; headers_out=[]; unknown={};institutions=Counter();balance_problems=[];raw_events=[];event_inputs_needed=[]
     with app.connect() as c:
         tickers={r['ticker'] for r in c.execute('SELECT ticker FROM catalog')}|{r['ticker'] for r in c.execute('SELECT ticker FROM assets')}
         previous=[r for r in app.read_cache(c,'import_receipts',[]) if r['file_hash']==file_hash]
@@ -305,6 +314,11 @@ def preview(app,d):
             treasury=treasury_import.product(product)
             bank_product=treasury_import.bank_product(product)
             income_kind=INCOME_KINDS.get(event)
+            corp=corporate_events.KINDS.get(event)
+            if corp and (mode=='income' or d.get('skip_events')):
+                ignored.append({'sheet':sh['name'],'line':row['line'],'reason':corporate_events.LABELS[corp]+(' · excluído por sua escolha; a posição deste ativo pode ficar diferente da B3.' if d.get('skip_events') else ' · fora do tipo escolhido (apenas proventos).')}); continue
+            if event in corporate_events.NOT_AUTOMATIC:
+                ignored.append({'sheet':sh['name'],'line':row['line'],'reason':corporate_events.NOT_AUTOMATIC[event]}); continue
             trade_side='buy' if event in ('compra','c') else 'sell' if event in ('venda','v') else None
             if event in ('transferencia - liquidacao','transferencia liquidacao','liquidacao'):
                 if has_negotiation and not bank_product:
@@ -316,12 +330,12 @@ def preview(app,d):
                 trade_side='buy' if direction in ('entrada','credito','c') else 'sell' if direction in ('saida','debito','d') else None
             if (treasury or bank_product) and event in ('resgate antecipado','vencimento/resgate saldo em conta','vencimento resgate saldo em conta','vencimento','resgate'):
                 trade_side='sell'
-            if mode=='income' and not income_kind or mode=='trades' and not trade_side or not (income_kind or trade_side):
+            if not corp and (mode=='income' and not income_kind or mode=='trades' and not trade_side or not (income_kind or trade_side)):
                 ignored.append({'sheet':sh['name'],'line':row['line'],'reason':str(get('event'))[:150]+' · evento fora do tipo escolhido ou sem tratamento automático.'}); continue
             if income_kind and direction not in ('','credito','entrada','c'):
                 ignored.append({'sheet':sh['name'],'line':row['line'],'reason':'Provento sem entrada/crédito positivo; revisar estorno ou débito.'}); continue
             market=key(get('market'))
-            if trade_side and not bank_product and market and market not in ('mercado a vista','a vista','fracionario','mercado fracionario','vista'):
+            if trade_side and not corp and not bank_product and market and market not in ('mercado a vista','a vista','fracionario','mercado fracionario','vista'):
                 ignored.append({'sheet':sh['name'],'line':row['line'],'reason':'Mercado não suportado: '+str(get('market'))[:80]}); continue
             try:
                 m=re.match(r'^([A-Z0-9]{3,8}\d{1,2}F?)(?:\s|$|[-.])',product)
@@ -334,6 +348,16 @@ def preview(app,d):
                 original_bank=app.text_value(str(get('institution') or 'Não informada'),150,True)
                 bank=institution_map.get(original_bank,original_bank);institutions[original_bank]+=1
                 external_id=app.text_value(str(get('external_id') or ''),150)
+                if corp:
+                    if treasury or bank_product: raise ValueError(corporate_events.LABELS[corp]+' em renda fixa não é tratado automaticamente.')
+                    if ticker not in tickers and ticker not in historical:
+                        unknown.setdefault(ticker,{'ticker':ticker,'product':product,'lines':[]})['lines'].append(location)
+                        if d.get('skip_unknown'):
+                            ignored.append({'sheet':sh['name'],'line':row['line'],'reason':ticker+' · ativo não identificado, excluído por opção explícita.'}); continue
+                        raise ValueError('Ativo '+ticker+' fora do catálogo atual: '+product[:100]+'. Atualize o catálogo ou confirme o cadastro histórico na prévia.')
+                    raw_events.append(corporate_events.raw_event(corp,direction,ticker,date,bank,numeric(app,get('quantity'),'Quantidade',True),
+                        numeric(app,get('price'),'Preço unitário',True),numeric(app,get('amount'),'Valor da operação',True),sh['name'],row['line']))
+                    continue
                 if trade_side:
                     if not treasury and not bank_product and ticker not in tickers and ticker not in historical:
                         unknown.setdefault(ticker,{'ticker':ticker,'product':product,'lines':[]})['lines'].append(location)
@@ -375,7 +399,17 @@ def preview(app,d):
                     ignored.append({**detail,'reason':'Excluída por sua escolha: '+str(exc)})
                 else:
                     errors.append(location+': '+str(exc));error_details.append(detail)
-    stats={'added':0,'updated':0,'skipped':0,'position_changes':[]}; token=None
+    if raw_events:
+        events,problems=corporate_events.group(app,raw_events,event_inputs)
+        for item in events: item['historical']=historical.get(item['data']['ticker'])
+        rows+=events
+        for prob in problems:
+            detail={'sheet':prob['sheet'],'line':prob['line'],'reason':prob['reason'],'product':prob['ticker']}
+            if d.get('skip_invalid'): ignored.append({**detail,'reason':'Excluída por sua escolha: '+prob['reason']})
+            else:
+                errors.append(prob['sheet']+' · linha '+str(prob['line'])+': '+prob['reason']);error_details.append(detail)
+                event_inputs_needed.append({k:prob[k] for k in ('key','need','ticker','event','date','institution','b3_in','b3_out')})
+    stats={'added':0,'updated':0,'skipped':0,'position_changes':[],'corporate_events':[]}; token=None
     with app.WRITE_LOCK, app.connect() as c:
         rev=revision(c)
         if rows and not errors:
@@ -394,10 +428,12 @@ def preview(app,d):
                 if app.CSV_PREVIEWS[k]['expires']<time.time(): del app.CSV_PREVIEWS[k]
             if len(app.CSV_PREVIEWS)>30: app.CSV_PREVIEWS.pop(next(iter(app.CSV_PREVIEWS)))
             token=app.secrets.token_urlsafe(24)
-            app.CSV_PREVIEWS[token]={'kind':'b3','rows':rows,'revision':rev,'expires':time.time()+900,'has_ignored':bool(ignored),'has_openings':any(r.get('opening') for r in rows),'file_hash':file_hash,'filename':filename,'ignored_count':len(ignored)}
+            app.CSV_PREVIEWS[token]={'kind':'b3','rows':rows,'revision':rev,'expires':time.time()+900,'has_ignored':bool(ignored),'has_openings':any(r.get('opening') for r in rows),'has_events':bool(stats['corporate_events']),'file_hash':file_hash,'filename':filename,'ignored_count':len(ignored)}
     return {'sheets':[s['name'] for s in sheets],'selected_sheet':selection,'headers':headers_out,
             'mapping':mappings[0]['mapping'] if len(mappings)==1 else {},'mappings':mappings,'fields':FIELDS,
-            'rows':[{'sheet':r['sheet'],'line':r['line'],'record_type':r['kind'],'opening':bool(r.get('opening')),**r['data']} for r in rows[:100]],
+            'rows':[{'sheet':r['sheet'],'line':r['line'],'record_type':r['kind'],'opening':bool(r.get('opening')),**r['data']} for r in [x for x in rows if x['kind']!='event'][:100]],
+            'event_inputs_needed':event_inputs_needed,
+            'event_rows':[{'key':corporate_events.key(r['data']),**{k:r['data'].get(k) for k in ('ticker','event','date','institution','b3_in','b3_out','unit_cost','after')}} for r in rows if r['kind']=='event'][:200],
             'opening_rows':[r['data'] for r in rows if r.get('opening')],
             'balance_issues':balance_problems,'institutions':[{'original':bank,'resolved':institution_map.get(bank,bank),'count':count} for bank,count in institutions.items()],
             'total':len(rows),'errors':errors[:100],'error_count':len(errors),'error_details':error_details[:100], 'previous_imports':previous[-5:],'unknown_assets':list(unknown.values()),'ignored':ignored[:100],'ignored_count':len(ignored),'token':token,**stats,
@@ -407,7 +443,8 @@ def preview(app,d):
                      'Liquidação só vira compra/venda com opção confirmada. A aba Negociação tem prioridade nos ativos de bolsa; títulos bancários vêm de Movimentação. Confira duplicidade com lançamentos manuais ou outros extratos.',
                      'Sem horário de execução: compras antes das vendas no mesmo dia. A apuração tributária intradia exige a nota de corretagem.',
                      'Não substitui posição anterior: importe todo o histórico ou registre o saldo anterior com seu custo.',
-                     'Dividendos, JCP e rendimentos são separados das posições. Valor da operação é mantido conforme a base escolhida; não há IR presumido.']}
+                     'Dividendos, JCP e rendimentos são separados das posições. Valor da operação é mantido conforme a base escolhida; não há IR presumido.',
+                     'Desdobramento, grupamento, bonificação e fração retirada mudam a quantidade sem criar compra ou venda. Bonificação soma o custo atribuído informado; o desdobramento dilui o preço médio.']}
 
 def commit(app,d):
     with app.WRITE_LOCK,app.connect() as c:
@@ -417,6 +454,7 @@ def commit(app,d):
         if d.get('confirm_records') is not True: raise ValueError('Confirme as operações e posições antes de salvar.')
         if plan.get('has_openings') and d.get('confirm_openings') is not True:raise ValueError('Confirme que os saldos anteriores vieram do seu histórico e não de uma estimativa automática.')
         if plan['has_ignored'] and d.get('ack_ignored') is not True: raise ValueError('Confirme a revisão dos eventos excluídos antes de salvar.')
+        if plan.get('has_events') and d.get('confirm_events') is not True: raise ValueError('Confirme os eventos corporativos (quantidade antes e depois) antes de salvar.')
         result=apply(app,c,plan['rows'])
         receipt={'file_hash':plan['file_hash'],'filename':plan['filename'],'saved_at':app.now(),'added':result['added'],'skipped':result['skipped'],'ignored':plan['ignored_count']}
         receipts=app.read_cache(c,'import_receipts',[]);receipts.append(receipt)

@@ -141,7 +141,7 @@ def apply_rows(app, c, kind, rows):
         except (ValueError, KeyError) as exc:
             raise ValueError(f'Linha {line}: {exc}')
     for aid in changed_assets:
-        app.position([dict(t) for t in c.execute('SELECT * FROM trades WHERE asset_id=?',(aid,))])
+        app.position(app.asset_ledger(c,aid))
     return {'added':added,'updated':updated,'skipped':skipped}
 
 def preview(app, d):

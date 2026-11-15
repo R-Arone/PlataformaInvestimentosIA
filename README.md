@@ -50,6 +50,16 @@ Em **Análise do FII → Análise completa → Seus seis critérios para FIIs**,
 
 Papel e fundos de fundos mantêm os critérios de crédito e fundos investidos; os três critérios de imóveis físicos ficam como não aplicáveis. Perfil desconhecido e dados sem evidência permanecem pendentes. P/VP usa referência de até sete dias; yield comparável, até 31 dias; informações qualitativas, até 180 dias. As conferências ficam na carteira e nos backups locais, fora do repositório.
 
+## Integração com a B3 por arquivo
+
+A importação lê os extratos baixados da Área do Investidor; nada é enviado à B3. A API oficial da Área do Investidor é contratada apenas por empresas licenciadas, por isso o caminho para pessoa física continua sendo o arquivo.
+
+- **Negociação e Movimentação:** compras, vendas, proventos, Tesouro, CDB, LCI e LCA, com prévia antes de salvar.
+- **Eventos corporativos da Movimentação:** desdobramento, grupamento, bonificação em ativos e fração retirada para leilão mudam a quantidade sem criar compra ou venda. A prévia mostra a quantidade antes e depois, a proporção e pede confirmação. O desdobramento dilui o preço médio; o grupamento mantém o custo total; a bonificação exige o custo atribuído do fato relevante quando o extrato não o traz; a fração sai pelo preço médio. Se a proporção não bater com o fato relevante, informe a quantidade depois do evento. Leilão de fração, incorporação, cisão e troca de código continuam para revisão manual. Os eventos aparecem no detalhe do ativo e podem ser excluídos.
+- **Conferir com o extrato de Posição:** em **Configurações → Importar dados**, envie o Excel de Extratos → Posição. A comparação é somente leitura: mostra por ativo e instituição o que confere, o que difere, o que só existe na B3 ou só na carteira local, com a causa provável (evento não importado, nome de instituição, compra/venda faltante). A carteira é calculada até a data da posição.
+
+Backups exportados passam ao formato `aporte-brasil-v7`, que inclui os eventos corporativos; backups anteriores continuam aceitos.
+
 ## Receber atualizações de código
 
 Na pasta clonada, execute:
@@ -186,3 +196,11 @@ A qualidade passa a destacar **critérios comprovados / total**, com cobertura e
 **De que o negócio depende?** pesquisa por IA segmentos, crédito PF/PJ/agro, receitas, custos, dívida e insumos com fontes. Propostas operacionais podem ser editadas e revisadas; só as revisadas ponderam o contexto, independentemente da correlação da ação.
 
 Em Aportar, **Fundamentos + contexto econômico** e **Cenário de IA + fundamentos** ficam separados das regras e dos modelos de preços. A opção de cenário permite criar ou escolher uma hipótese salva, ajustar o peso e conferir a mudança da prioridade. Indicadores antigos ou exposições não revisadas não recebem pontos. Os filtros de compra e limites da carteira continuam. Veja [método, fontes e limites](LONGO_PRAZO.md).
+
+## Múltiplos vs. histórico da própria empresa
+
+Para ações e FIIs da B3, o detalhe do ativo, a aba "Preço e valor" do aporte e a página de cenários de preço mostram o múltiplo atual contra a média e a mediana mensais de 3, 5 ou 10 anos, com percentil e desvios-padrão.
+
+- Cada setor destaca os indicadores usuais (por exemplo: bancos P/VP e P/L; energia e saneamento EV/EBITDA e dividend yield; commodities EV/EBITDA; varejo EV/EBITDA, P/L e P/Receita; FIIs P/VP e dividend yield). Dívida líquida/EBITDA aparece como contexto de risco, não como sinal de preço.
+- Série mensal: fechamento do mês sem ajuste de proventos (Yahoo, 10 anos) × balanço que já estava divulgado naquela data (ITR 45 dias, DFP 3 meses). Ações usam o número atual de ações implícito no VPA/LPA publicados; FIIs usam o VPA do informe mensal da CVM, corrigido por desdobramentos.
+- A leitura usa percentil e mediana; múltiplo abaixo do histórico não prova que a ação está barata. Quando a série observada de P/L ou P/VP é curta, os métodos "P/L histórico" e "P/VP histórico" usam a série reconstruída.

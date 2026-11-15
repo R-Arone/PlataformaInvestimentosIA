@@ -29,5 +29,5 @@ def add_opening(app,c,aid,d):
         raise ValueError('Este ativo já tem operações nesta instituição. Confira o histórico; uma posição inicial adicional duplicaria o saldo. Use o saldo anterior da prévia B3 para conciliar um extrato incompleto.')
     rid=c.execute("INSERT INTO trades(asset_id,side,quantity,price,fees,date,institution) VALUES (?,'buy',?,?,0,?,?)",(aid,q,average,day,bank)).lastrowid
     c.execute("INSERT INTO imported_rows VALUES (?,'positions',?,?)",(fp,rid,app.now()))
-    app.position([dict(t) for t in c.execute('SELECT * FROM trades WHERE asset_id=?',(aid,))])
+    app.position(app.asset_ledger(c,aid))
     return {'opening_added':True,'quantity':q,'average':average,'cost':q*average}

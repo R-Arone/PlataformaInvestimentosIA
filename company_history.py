@@ -458,6 +458,11 @@ def refresh(app, a, include_cvm=False):
             save(app, a, 'issuer_governance', payload, 'Consulta pública · B3 / segmento de listagem')
             received.append('issuer_governance')
         except (ValueError, KeyError, TypeError) as exc: errors.append(str(exc) if isinstance(exc, ValueError) else 'Governança B3 indisponível; confira o estatuto.')
+    if a['asset_type'] == 'stock':
+        import multiple_history
+        try:
+            received.extend(multiple_history.refresh(app, a)['received'])
+        except (ValueError, KeyError, TypeError) as exc: errors.append('Histórico de preços para múltiplos: '+(str(exc) if isinstance(exc, ValueError) else 'Formato da fonte não reconhecido; dados anteriores preservados.'))
     if include_cvm:
         try:
             import public_reports

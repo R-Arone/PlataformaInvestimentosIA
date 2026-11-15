@@ -240,6 +240,10 @@ def refresh(app,a):
             save(app,a,'fii_dividends',{'symbol':a['ticker'],'items':items,'source_url':'https://finance.yahoo.com/quote/'+a['ticker']+'.SA/history/'},'Yahoo · eventos de proventos por data ex, pagamentos/amortizações a conferir')
             received.append('fii_dividends')
         except (ValueError,KeyError,TypeError) as fallback:warnings.append('Rendimentos Yahoo: '+(str(fallback) if isinstance(fallback,ValueError) else 'Sem eventos reconhecidos.'))
+    try:
+        import multiple_history
+        received.extend(multiple_history.refresh(app,a)['received'])
+    except (ValueError,KeyError,TypeError) as exc:warnings.append('Histórico de preços para P/VP e DY: '+(str(exc) if isinstance(exc,ValueError) else 'Formato da fonte não reconhecido; dados anteriores preservados.'))
     with app.WRITE_LOCK,app.connect() as c:
         app.write_cache(c,'fii_attempt_'+str(a['id']),{'at':app.now(),'warnings':warnings})
     return {'received':received,'warnings':warnings}
