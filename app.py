@@ -42,6 +42,10 @@ import fii_research
 import international_market
 import history_cache
 import multiple_history
+import price_context
+import asset_correlation
+import benchmark_prices
+import fixed_income
 import portfolio_strategy
 import long_term
 import investment_value
@@ -510,6 +514,7 @@ def state():
                 a['analysis']['score']=None
                 a['analysis']['problems'] += ['Revisar critério por setor: '+r['label'] for r in critical]
             a['multiple_history']=multiple_history.analyze(a,age,today())
+            a['price_context']=price_context.analyze(a,today())
             if a['asset_type']=='stock':
                 a['valuation']=valuation.for_asset(a,read_cache(c,'valuation_cases',{}).get(a['ticker'],{}),number,age)
                 a['valuation_alert']=valuation.alert(a,cfg['expensive_alert_percent'])
@@ -526,6 +531,8 @@ def state():
             a.pop('_statement_metrics', None)
             a.pop('_fii_metrics', None)
         factor_analysis.enrich(sys.modules[__name__], assets)
+        benchmark_cache=read_cache(c,benchmark_prices.CACHE,{})
+        asset_correlation.enrich(assets,benchmark_prices.series_for(benchmark_cache),today(),now())
         fixed = [dict(r) for r in c.execute('SELECT * FROM fixed WHERE archived=0 ORDER BY name')]
         tesouro_market = read_cache(c,'tesouro_market',{})
         for f in fixed:
@@ -552,6 +559,7 @@ def state():
                 'exposure_themes':investment_exposure.THEMES,
                 'issuer_auto':read_cache(c,'issuer_auto',True),
                 'coupling':portfolio_coupling.analyze(assets,fixed,today(),now()),
+                'benchmark_info':benchmark_prices.public(benchmark_cache),
                 'signals':signal_state,
                 'us_market':us_state,
                 'allocation':portfolio_strategy.allocation(assets,fixed,public_cfg,age),
@@ -1872,6 +1880,8 @@ class Handler(BaseHTTPRequestHandler):
                  '/aporte-cards.js': ('aporte-cards.js', 'application/javascript'),
                  '/valuation-choice.js': ('valuation-choice.js', 'application/javascript'),
                  '/multiples.js': ('multiples.js', 'application/javascript'),
+                 '/price-context.js': ('price-context.js', 'application/javascript'),
+                 '/fixed-income.js': ('fixed-income.js', 'application/javascript'),
                  '/investment-context.js': ('investment-context.js', 'application/javascript'),
                  '/b3-sync.js': ('b3-sync.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
@@ -1983,6 +1993,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(tesouro.action(sys.modules[__name__],path,d))
             if path == '/api/project':
                 return self.respond(projection(d))
+            if path == '/api/fixed/analyze':
+                return self.respond(fixed_income.analyze(d, today()))
+            if path == '/api/prices/benchmarks':
+                return self.respond(benchmark_prices.fetch(sys.modules[__name__], d.get('force') is True))
             if path == '/api/fx':
                 return self.respond(fx_projection(d, number))
             if path == '/api/catalog/refresh':

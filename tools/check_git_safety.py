@@ -36,6 +36,7 @@ MODULES.update(('valuation_history.py','company_registry.py'))
 MODULES.update(('quality_evidence.py','business_drivers.py','contribution_context.py'))
 MODULES.update(('corporate_events.py','b3_position.py'))
 MODULES.add('multiple_history.py')
+MODULES.update(('price_context.py','asset_correlation.py','benchmark_prices.py','fixed_income.py'))
 ROOT_FILES.add('LONGO_PRAZO.md')
 
 # Ensaios dependentes de bases locais ou de ferramentas offline nao publicadas.
