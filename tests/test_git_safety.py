@@ -23,6 +23,11 @@ class GitSafetyTests(unittest.TestCase):
             self.assertFalse(safety.allowed(name),name)
         for name in ('app.py','aporte_brasil/core/private_storage.py','static/security.js','.githooks/pre-push','SECURITY.md'):
             self.assertTrue(safety.allowed(name),name)
+    def test_legacy_root_modules_only_accepted_when_auditing_published_history(self):
+        self.assertFalse(safety.allowed('market.py'))
+        self.assertTrue(safety.allowed('market.py',history=True))
+        self.assertFalse(safety.allowed('private/anything.py',history=True))
+        self.assertFalse(safety.allowed('carteira.sqlite3',history=True))
     def test_staged_private_file_refused_even_forced_into_index(self):
         (self.root/'data').mkdir();(self.root/'data/carteira.sqlite3').write_bytes(b'SQLite format 3\x00TEST')
         self.git('add','data/carteira.sqlite3');self.assertEqual(self.check().returncode,1)

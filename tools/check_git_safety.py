@@ -88,13 +88,16 @@ MODULES={
 
 ROOT_FILES.add('LONGO_PRAZO.md')
 
+# Layout anterior (modulos soltos na raiz): so e aceito ao auditar o historico ja publicado.
+LEGACY_ROOT_MODULES={n.rsplit('/',1)[1] for n in MODULES if n.count('/')==2 and not n.endswith('__init__.py')}
+
 # Ensaios dependentes de bases locais ou de ferramentas offline nao publicadas.
 LOCAL_TESTS={'test_installer.py','test_model_comparison.py','test_company_history.py',
              'test_long_term_models.py','test_model_agreement.py','test_replay_models.py'}
 
-def allowed(name):
+def allowed(name,history=False):
     path=PurePosixPath(name)
-    if name in ROOT_FILES|MODULES:return True
+    if name in ROOT_FILES|MODULES or history and name in LEGACY_ROOT_MODULES:return True
     if '..' in path.parts or len(path.parts)!=2:return False
     parent,base=path.parts
     return (parent=='static' and path.suffix in ('.html','.css','.js','.svg')
@@ -150,7 +153,7 @@ def audit(history=False,staged=False,refs=()):
             entries.append((name,run('show',':'+name),None if mode in (b'100644',b'100755') else 'link/submodulo nao permitido'))
     violations=[]
     for name,data,problem in entries:
-        problem=problem or ('fora da lista de arquivos de codigo permitidos' if not allowed(name) else content_problem(data))
+        problem=problem or ('fora da lista de arquivos de codigo permitidos' if not allowed(name,history) else content_problem(data))
         if problem:violations.append(name+' ('+problem+')')
     if violations:
         print('Publicacao bloqueada: arquivos possivelmente privados:',file=sys.stderr)
