@@ -7,12 +7,14 @@ from concurrent.futures import ThreadPoolExecutor
 import market_brief
 import company_insights
 import company_quality
-
 KINDS = ('issuer_profile', 'issuer_quarters', 'issuer_market_history', 'issuer_dividend_history', 'issuer_opinions', company_quality.KIND, 'issuer_completion','issuer_business_drivers') + company_insights.KINDS
 CURRENCIES = ('BRL', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'CHF', 'AUD')
 
 
 def symbol(a):
+    if a['asset_type']=='bdr':
+        import stock_fundamentals
+        return stock_fundamentals.bdr_listing(a).get('symbol',a['ticker']+'.SA')
     return a['ticker'] + ('.SA' if a['asset_type'] == 'stock' else '')
 
 
@@ -316,7 +318,7 @@ def save(app, a, kind, payload, source):
         raise ValueError('O histórico pertence a outra empresa.')
     asof = payload.get('asof') or (payload['quarters'][-1]['date'] if kind == 'issuer_quarters' else app.today().isoformat())
     with app.WRITE_LOCK, app.connect() as c:
-        owner = c.execute('SELECT ticker,asset_type FROM assets WHERE id=? AND archived=0', (a['id'],)).fetchone()
+        owner = c.execute('SELECT ticker,asset_type,bdr_listing FROM assets WHERE id=? AND archived=0', (a['id'],)).fetchone()
         if not owner or symbol(dict(owner)) != payload['symbol']:
             raise ValueError('A empresa mudou durante a consulta.')
         old = app.latest(c, a['id']).get(kind, {}).get('data')
@@ -380,7 +382,7 @@ def refresh_current(app, a):
         for kind, (data, ref) in supplemental.items():
             if kind not in received: received[kind] = (data, ref, 'Fundamentus · detalhes/'+a['ticker'])
     with app.WRITE_LOCK, app.connect() as c:
-        owner = c.execute('SELECT ticker,asset_type FROM assets WHERE id=? AND archived=0', (a['id'],)).fetchone()
+        owner = c.execute('SELECT ticker,asset_type,bdr_listing FROM assets WHERE id=? AND archived=0', (a['id'],)).fetchone()
         if not owner or symbol(dict(owner)) != symbol(a): raise ValueError('A empresa mudou durante a consulta.')
         for kind, (data, ref, source) in received.items():
             ref = app.valid_date(ref)
@@ -479,7 +481,7 @@ def fetch_opinions(app, a):
     headlines = market_brief.fetch_feed(url, datetime.now(timezone.utc))[:12]
     with app.WRITE_LOCK, app.connect() as c:
         old = app.latest(c, a['id']).get('issuer_opinions', {}).get('data', {})
-        owner = c.execute('SELECT ticker,asset_type FROM assets WHERE id=? AND archived=0', (a['id'],)).fetchone()
+        owner = c.execute('SELECT ticker,asset_type,bdr_listing FROM assets WHERE id=? AND archived=0', (a['id'],)).fetchone()
         if not owner or symbol(dict(owner)) != symbol(a):
             raise ValueError('A empresa mudou durante a consulta.')
         manual = [r for r in old.get('items', []) if r['origin'] == 'manual'][:12]

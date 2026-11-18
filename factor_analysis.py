@@ -24,7 +24,6 @@ import company_history
 import sector_analysis
 import us_market
 import company_evidence
-
 KINDS = ('issuer_factor_history', 'issuer_factor_ideas', 'issuer_factor_scope')
 MIN_MONTHS = 36
 HAC_LAGS = 3
@@ -113,7 +112,12 @@ MODEL_COVERAGE = [
 
 
 def market(a):
-    return 'BR' if a.get('asset_type') == 'stock' else 'US' if a.get('asset_type') == 'foreign' else None
+    if a.get('asset_type')=='stock':return 'BR'
+    if a.get('asset_type')=='foreign':return 'US'
+    if a.get('asset_type')=='bdr':
+        import stock_fundamentals
+        return 'US' if stock_fundamentals.bdr_listing(a).get('market')=='US' else None
+    return None
 
 
 def month_number(ref):
@@ -405,7 +409,7 @@ def generate_ideas(app,d):
     current=company_research.asset(app,a['id'])
     if ideas_context(current)[1]!=digest:raise ValueError('A descrição da empresa mudou durante a análise; gere novamente.')
     with app.WRITE_LOCK,app.connect() as c:
-        owner=c.execute('SELECT ticker,asset_type FROM assets WHERE id=? AND archived=0',(a['id'],)).fetchone()
+        owner=c.execute('SELECT ticker,asset_type,bdr_listing FROM assets WHERE id=? AND archived=0',(a['id'],)).fetchone()
         if not owner or company_history.symbol(dict(owner))!=payload['symbol']:raise ValueError('A empresa mudou durante a análise.')
         app.add_snapshot(c,a['id'],KINDS[1],payload,'IA local · hipóteses de critérios',payload['asof'])
     market_ai.progress('Sugestões salvas. Revise a ligação com o negócio antes de adicioná-las ao estudo.')
@@ -586,7 +590,7 @@ def enrich(app, assets):
         # One current share class per issuer; no overweighting a bank with PN/ON.
         representatives = {}
         for peer in sorted(peers,key=lambda p:p['id']):
-            identity = peer['ticker'][:4] if mk=='BR' else sector_analysis.fold(peer.get('snapshots',{}).get('us_quote',{}).get('data',{}).get('issuer') or peer['ticker'])
+            identity = peer['ticker'][:4] if mk=='BR' else company_history.symbol(peer)
             representatives.setdefault(identity,peer)
         members, excluded, histories = [], [], []
         for peer in representatives.values():
@@ -788,7 +792,7 @@ def refresh(app,a,years=5,asset_ids=None,shared=None):
         payload=validate_snapshot(app,dict(symbol=company_history.symbol(peer),market=mk,currency=cfg['currency'],asof=day.isoformat(),years=years,
             prices=prices,benchmark=peer_benchmark,factors=peer_factors,warnings=warnings[:40],source_url=prices['source_url']))
         with app.WRITE_LOCK,app.connect() as c:
-            owner=c.execute('SELECT ticker,asset_type,sector FROM assets WHERE id=? AND archived=0',(peer['id'],)).fetchone()
+            owner=c.execute('SELECT ticker,asset_type,sector,bdr_listing FROM assets WHERE id=? AND archived=0',(peer['id'],)).fetchone()
             if not owner or company_history.symbol(dict(owner))!=payload['symbol'] or group(dict(owner))!=group(a):
                 warnings.append(peer['ticker']+': cadastro mudou durante a consulta.');continue
             app.add_snapshot(c,peer['id'],KINDS[0],payload,'Consulta pública · sensibilidade histórica',payload['asof'])

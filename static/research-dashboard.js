@@ -4,7 +4,7 @@ const researchRenderBefore=render,researchRowsBefore=simpleAssetRows,researchTab
 let researchSeen='';
 
 function researchScore(a){const q=qualityEvidence(a);return q.total?q.documented_score:null;}
-function researchCoverage(a){if(!['stock','foreign','global_stock','fii'].includes(a.asset_type))return 'Nota de empresa não aplicável';const s=a.fii_research?.study||a.company_research?.study,c=s?.counts;if(!c)return 'Sem critérios medidos';const total=c.pass+c.fail+c.unknown;return `${c.pass+c.fail}/${total} conhecidos · ${c.fail} negativos · ${c.unknown} sem dados`;}
+function researchCoverage(a){if(!['stock','foreign','global_stock','bdr','fii'].includes(a.asset_type))return 'Nota de empresa não aplicável';const s=a.fii_research?.study||a.company_research?.study,c=s?.counts;if(!c)return 'Sem critérios medidos';const total=c.pass+c.fail+c.unknown;return `${c.pass+c.fail}/${total} conhecidos · ${c.fail} negativos · ${c.unknown} sem dados`;}
 function researchReference(a){const p=a.value_reading,r=p?.reading;
  if(!r)return '<span class="muted">Sem referência aplicável / premissas a conferir</span>';
  return `${tag(esc(r.label),r.status==='cheap'?'good':r.status==='expensive'?'bad':'warn')}${p.reference>0?`<b>${money(p.reference)}</b><small>Teto: ${money(p.ceiling)} · ${esc(p.method)} · ${dt(p.asof)}</small>`:''}${r.disagreement?'<small>Métodos divergem; conferir premissas</small>':''}`;

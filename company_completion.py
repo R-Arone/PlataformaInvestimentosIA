@@ -9,7 +9,6 @@ import company_quality as quality
 import market_ai
 import market_brief
 import sector_analysis
-
 KIND='issuer_completion'
 FACT_LABELS=dict(innovation='Pesquisa e inovação',obsolete_sector='Setor obsoleto',dividend_payments='Histórico de dividendos',
  founded='Data de fundação',founded_year='Ano de fundação, sem inventar dia/mês',leadership='Liderança e medida do ranking',
@@ -58,7 +57,7 @@ def missing(app,a):
 def validate_request(app,d):
     if not isinstance(d,dict) or set(d)!={'asset_ids','use_ai','refresh_public'} or not isinstance(d['asset_ids'],list) or not 1<=len(d['asset_ids'])<=150 or any(type(i) is not int for i in d['asset_ids']) or len(set(d['asset_ids']))!=len(d['asset_ids']) or any(type(d[k]) is not bool for k in ('use_ai','refresh_public')):raise ValueError('Selecione empresas e como pesquisar os dados faltantes.')
     rows={a['id']:a for a in app.state()['assets']}
-    if any(i not in rows or rows[i]['asset_type'] not in ('stock','foreign','global_stock') for i in d['asset_ids']):raise ValueError('Escolha somente empresas cadastradas.')
+    if any(i not in rows or rows[i]['asset_type'] not in ('stock','foreign','global_stock','bdr') for i in d['asset_ids']):raise ValueError('Escolha somente empresas cadastradas.')
     if not d['use_ai'] and not d['refresh_public']:raise ValueError('Selecione fontes públicas ou pesquisa com IA.')
     return dict(d)
 

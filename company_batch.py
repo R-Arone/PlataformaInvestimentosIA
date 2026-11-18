@@ -4,14 +4,12 @@ import company_history
 import company_research
 import factor_analysis
 import market_ai
-
-
 def validate(app,d):
     if not isinstance(d,dict) or set(d) not in ({'asset_ids','years','refresh','use_ai'},{'asset_ids','years','refresh','use_ai','all_types'}) or not isinstance(d['asset_ids'],list) or not 1<=len(d['asset_ids'])<=150 or any(type(i) is not int or i<1 for i in d['asset_ids']) or len(set(d['asset_ids']))!=len(d['asset_ids']):raise ValueError('Selecione entre 1 e 150 ativos cadastrados, sem repetições.')
     if 'all_types' in d and type(d['all_types']) is not bool:raise ValueError('Opção de tipos inválida.')
     if type(d['years']) is not int or d['years'] not in factor_analysis.WINDOWS or any(type(d[k]) is not bool for k in ('refresh','use_ai')):raise ValueError('Opções da análise em lote inválidas.')
     assets={a['id']:a for a in app.state()['assets']}
-    allowed=('stock','foreign','global_stock','fii','etf','global_etf','bdr','crypto') if d.get('all_types') else ('stock','foreign','global_stock')
+    allowed=('stock','foreign','global_stock','fii','etf','global_etf','bdr','crypto') if d.get('all_types') else ('stock','foreign','global_stock','bdr')
     if any(i not in assets or assets[i]['asset_type'] not in allowed for i in d['asset_ids']):raise ValueError('O lote aceita apenas os tipos selecionados de ativos acompanhados.')
     return dict(d)
 
@@ -38,7 +36,7 @@ def run(app,d):
                 result=fn() or {};row['received'].extend(result.get('received',[]));row['warnings'].extend(result.get('warnings',[]));return result
             except Exception as exc:
                 row['warnings'].append(str(exc) if isinstance(exc,ValueError) else label+': fonte indisponível; dados anteriores preservados.');return None
-        if a['asset_type'] not in ('stock','foreign','global_stock'):
+        if a['asset_type'] not in ('stock','foreign','global_stock','bdr') or a['asset_type']=='bdr' and not __import__('stock_fundamentals').bdr_listing(a):
             row['asset_type']=a['asset_type']
             if d['refresh']:step('Dados próprios deste produto',lambda:refresh_product(app,a))
             current=next((r for r in app.state()['assets'] if r['id']==aid),a)

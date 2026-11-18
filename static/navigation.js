@@ -4,7 +4,7 @@ const simpleBaseRender=render,simpleBaseBind=bindForms,simpleNews=newsView,simpl
 const simpleSections=[
  {id:'overview',icon:'◫',label:'Início',routes:['overview']},
  {id:'portfolio',icon:'▤',label:'Carteira',routes:['portfolio','income'],tabs:[['portfolio','Posições'],['income','Proventos']]},
- {id:'watchlist',icon:'◎',label:'Analisar ativos',routes:['watchlist','compare','sectors','prices','us','global'],tabs:[['watchlist','Minha lista'],['compare','Comparar']],tools:[['sectors','Setores e critérios'],['prices','Cenários de preço']]},
+ {id:'watchlist',icon:'◎',label:'Analisar ativos',routes:['watchlist','compare','sectors','prices','us','global'],tabs:[['watchlist','Minha lista'],['us','Stocks e BDRs'],['compare','Comparar']],tools:[['sectors','Setores e critérios'],['prices','Cenários de preço']]},
  {id:'long-term',icon:'◇',label:'Aportar',routes:['long-term','goals','rates','tesouro','fx','taxes'],tabs:[['long-term','Sugerir aporte'],['goals','Metas e limites']],tools:[['rates','Renda fixa'],['tesouro','Meus Tesouros'],['fx','Custo do dólar'],['taxes','Impostos por produto']]},
  {id:'news',icon:'◈',label:'Mercado',routes:['news','signals','crypto'],tools:[['signals','Modelos de IA'],['crypto','Bitcoin']]},
  {id:'settings',icon:'⚙',label:'Configurações',routes:['settings','imports','sources'],tabs:[['settings','Preferências e backup'],['imports','Importar dados'],['sources','Fontes e atualização']]}
@@ -170,7 +170,7 @@ function simpleTidy(){
 
 render=function(){
  if(!S)return simpleBaseRender();
- if(view==='us'||view==='global'){simpleFilters.market=view==='us'?'US':'GLOBAL';view='watchlist';history.replaceState(null,'','#watchlist');}
+ if(view==='global'){simpleFilters.market=view==='us'?'US':'GLOBAL';view='watchlist';history.replaceState(null,'','#watchlist');}
  simpleBaseRender();if(!S||document.body.classList.contains('vault-locked'))return;
  simpleTidy();simpleNavigation();simpleSessionControls();
 };

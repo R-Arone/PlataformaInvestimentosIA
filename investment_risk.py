@@ -6,7 +6,6 @@ import sector_analysis
 import investment_exposure
 import portfolio_coupling as coupling
 import recommendation_signals as signals
-
 DIMENSIONS=('Previsibilidade da demanda','Recorrência da receita','Resistência ao ciclo','Flexibilidade de capital','Visibilidade competitiva/regulatória')
 # Authored 1–5 starting assumptions, not measured sector performance or agency ratings.
 RATINGS={'bank':(4,4,3,3,3),'insurance':(4,4,3,3,3),'financial_services':(4,3,3,4,3),
@@ -24,7 +23,7 @@ def profile(a):return a.get('sector_analysis',{}).get('profile') or sector_analy
 
 
 def rating(a):
-    key=profile(a);values=RATINGS.get(key) if a.get('asset_type') in ('stock','foreign','global_stock') else None
+    key=profile(a);values=RATINGS.get(key) if a.get('asset_type') in ('stock','foreign','global_stock','bdr') else None
     score=round(sum(values)/25*100) if values else None
     return dict(profile=key,label=sector_analysis.PROFILES.get(key,{'label':a.get('sector','Não classificado')})['label'],score=score,
         dimensions=[dict(label=k,value=v,maximum=5) for k,v in zip(DIMENSIONS,values or ())],

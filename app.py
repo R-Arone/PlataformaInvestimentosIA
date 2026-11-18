@@ -186,6 +186,7 @@ def init_db():
         ''')
         additions = {'assets': {'asset_type': "TEXT NOT NULL DEFAULT 'stock'", 'verified': 'INTEGER NOT NULL DEFAULT 0',
                                'research_profile': "TEXT NOT NULL DEFAULT 'auto'", 'archived':'INTEGER NOT NULL DEFAULT 0',
+                               'bdr_listing':"TEXT NOT NULL DEFAULT '{}'",
                                'auto_sector':'INTEGER NOT NULL DEFAULT 0 CHECK(auto_sector IN (0,1))'},
                      'trades': {'institution': "TEXT NOT NULL DEFAULT 'Não informada'"},
                      'fixed': {'institution': "TEXT NOT NULL DEFAULT 'Não informada'",
@@ -375,7 +376,7 @@ def analysis(assets, cfg, macros):
             reason = {'etf': 'ETF: avaliar índice, custo, liquidez e diversificação; P/L e ROE da empresa não se aplicam.',
                       'fii': 'FII: comparar P/VP e DY com fundos do mesmo segmento; revisar vacância, renda e carteira.',
                       'crypto': 'Bitcoin: observar risco e sentimento; não possui balanço nem múltiplos fundamentalistas.',
-                      'bdr':'BDR: suporte básico em reais; comparar moeda, custos, custódia e tributação. Integração de fundamentos será posterior.',
+                      'bdr':'BDR em reais: vincule a empresa no exterior para analisar fundamentos, premissas e correlações na moeda do emissor.',
                       'global_stock':'Stock internacional: use critérios do setor, balanços na moeda informada e cotação nativa. Não recebe o ranking brasileiro.',
                       'global_etf':'ETF internacional: conferir área, índice, custo, domicílio, moeda e composição; não recebe critérios de lucro e dívida de empresas.',
                       'foreign':'Stocks dos EUA têm comparação própria em USD; consulte a página Stocks dos EUA. O ranking brasileiro e seus juros não são aplicados a elas.'}[typ]
@@ -469,7 +470,7 @@ def state():
                 if kind in company_research.KINDS+fii_research.KINDS+multiple_history.KINDS:
                     snapshot['url'] = snapshot['data'].get('source_url') or snapshot['data'].get('url') or ''
                 elif kind in stock_fundamentals.KINDS:
-                    snapshot['url']=snapshot['data']['source_url']
+                    snapshot['url']=snapshot['data'].get('source_url','https://finance.yahoo.com/quote/'+snapshot['data']['symbol']+'/')
                 elif a['asset_type'] in international_market.TYPES and (kind in international_market.KINDS or snapshot['source'].startswith('Yahoo Finance')):
                     snapshot['url']=a['international']['composition_url'] if kind=='international_listing' else 'https://finance.yahoo.com/quote/'+(snapshot['data'].get('symbol',a['ticker']))+'/'
                 else:
@@ -915,6 +916,12 @@ def refresh_worker(asset_id=None):
             errors.append(a['ticker']+': '+message)
             with WRITE_LOCK, connect() as c:
                 log_source(c,'bdr_'+str(a['id']),a['ticker']+' · BDR','https://finance.yahoo.com/quote/'+a['ticker']+'.SA/','error',error=message)
+        if stock_fundamentals.bdr_listing(a):
+            try:
+                result=company_research.company_history.refresh(sys.modules[__name__],a)
+                errors.extend(a['ticker']+': '+w for w in result['warnings'])
+                company_research.refresh_annual(sys.modules[__name__],a)
+            except Exception as exc:errors.append(a['ticker']+': '+(str(exc) if isinstance(exc,ValueError) else 'Pesquisa da empresa indisponível; dados anteriores preservados.'))
     try:
         with connect() as c:
             cfg = settings(c)
@@ -1209,8 +1216,14 @@ def restore(c, d):
         a.setdefault('asset_type', 'stock'); a.setdefault('verified', 0)
         a.setdefault('research_profile', 'auto')
         a.setdefault('archived',0)
+        a.setdefault('bdr_listing','{}')
+        if not isinstance(a['bdr_listing'],str) or len(a['bdr_listing'])>4000:raise ValueError('Vínculo do BDR inválido no backup.')
+        link=json.loads(a['bdr_listing'])
+        if link:
+            if a['asset_type']!='bdr' or stock_fundamentals.validate_bdr_listing(sys.modules[__name__],link)!=link:raise ValueError('Vínculo do BDR inválido no backup.')
+        elif link!={}:raise ValueError('Vínculo do BDR inválido no backup.')
         a.setdefault('auto_sector',0)
-        if type(a['auto_sector']) is not int or a['auto_sector'] not in (0,1) or a['auto_sector'] and a['asset_type'] not in ('foreign','global_stock'):
+        if type(a['auto_sector']) is not int or a['auto_sector'] not in (0,1) or a['auto_sector'] and a['asset_type'] not in ('foreign','global_stock','bdr'):
             raise ValueError('Preferência de setor automático inválida.')
         if a['archived'] not in (0,1): raise ValueError('Situação de ativo inválida.')
     for t in tables.get('trades', []):
@@ -1267,9 +1280,11 @@ def restore(c, d):
         elif s['kind'] in stock_fundamentals.KINDS:
             payload=stock_fundamentals.validate_snapshot(sys.modules[__name__],s['kind'],payload)
             owner=next((a for a in tables['assets'] if a['id']==s['asset_id']),None)
-            if not owner or owner['asset_type'] not in ('foreign','global_stock') or payload['symbol']!=stock_fundamentals.symbol(owner['ticker'],payload['market']):
+            identity=stock_fundamentals.research_identity(owner) if owner and owner['asset_type']=='bdr' else (owner['ticker'],payload['market']) if owner else ('','')
+            if not owner or owner['asset_type'] not in ('foreign','global_stock','bdr') or payload['symbol']!=stock_fundamentals.symbol(*identity) or payload['market']!=identity[1] or s['kind']=='bdr_underlying_quote' and owner['asset_type']!='bdr':
                 raise ValueError('Pesquisa de stock não corresponde ao ativo do backup.')
             if owner['asset_type']=='foreign' and payload['market']!='US':raise ValueError('Pesquisa americana em bolsa incompatível.')
+            if s['kind']=='bdr_underlying_quote' and payload['currency']!=stock_fundamentals.bdr_listing(owner)['currency']:raise ValueError('Moeda da ação do BDR difere do vínculo.')
         elif s['kind'] in international_market.KINDS:
             payload=international_market.validate_snapshot(sys.modules[__name__],s['kind'],payload)
             owner=next((a for a in tables['assets'] if a['id']==s['asset_id']),None)
@@ -1290,7 +1305,7 @@ def restore(c, d):
         elif s['kind'] in company_research.KINDS:
             payload=company_research.validate_snapshot(sys.modules[__name__],s['kind'],payload)
             issuer=next((a for a in tables['assets'] if a['id']==s['asset_id']),None)
-            if not issuer or issuer['asset_type'] not in ('stock','foreign','global_stock') or 'symbol' in payload and payload['symbol']!=company_research.annual_symbol(issuer):
+            if not issuer or issuer['asset_type'] not in ('stock','foreign','global_stock','bdr') or 'symbol' in payload and payload['symbol']!=company_research.annual_symbol(issuer):
                 raise ValueError('Pesquisa financeira não corresponde à empresa do backup.')
             if s['kind'] in factor_analysis.KINDS and payload['market'] != factor_analysis.market(issuer):
                 raise ValueError('Mercado do histórico de fatores não corresponde à empresa do backup.')
@@ -1454,13 +1469,14 @@ def mutate(path, d):
     with WRITE_LOCK, connect() as c:
         if path == '/api/assets':
             values, verified = asset_values_from_catalog(c, d)
-            if 'auto_sector' in d and (type(d['auto_sector']) is not bool or d['auto_sector'] and values[-1] not in ('foreign','global_stock')):
+            if 'auto_sector' in d and (type(d['auto_sector']) is not bool or d['auto_sector'] and values[-1] not in ('foreign','global_stock','bdr')):
                 raise ValueError('Setor automático disponível apenas para stocks.')
             if d.get('id'):
                 if not c.execute('SELECT 1 FROM assets WHERE id=?', (d['id'],)).fetchone():
                     raise ValueError('Ativo não encontrado.')
                 original_row = c.execute('SELECT ticker,asset_type FROM assets WHERE id=?', (d['id'],)).fetchone()
                 original=original_row['ticker']
+                if 'bdr' in (original_row['asset_type'],values[-1]) and original_row['asset_type']!=values[-1]:raise ValueError('Cadastre outro produto separadamente para alterar o tipo do BDR.')
                 if (original_row['asset_type'] in international_market.TYPES or values[-1] in international_market.TYPES) and original_row['asset_type']!=values[-1]:
                     raise ValueError('Cadastre outro produto separadamente para alterar o tipo internacional.')
                 if original != values[0]:
@@ -1470,6 +1486,12 @@ def mutate(path, d):
             else:
                 cur = c.execute('INSERT INTO assets(ticker,name,sector,financial,notes,asset_type,verified) VALUES (?,?,?,?,?,?,?)', (*values, verified))
                 aid=cur.lastrowid
+            if 'bdr_listing' in d:
+                if values[-1]!='bdr':raise ValueError('Vínculo de emissor disponível apenas para BDRs.')
+                link=stock_fundamentals.validate_bdr_listing(sys.modules[__name__],d['bdr_listing'])
+                old=json.loads(c.execute('SELECT bdr_listing FROM assets WHERE id=?',(aid,)).fetchone()['bdr_listing'])
+                if old and any(old[k]!=link[k] for k in ('symbol','market','currency')):raise ValueError('Cadastre outro ativo para alterar a empresa, bolsa ou moeda do BDR já vinculado.')
+                c.execute('UPDATE assets SET bdr_listing=? WHERE id=?',(json.dumps(link,ensure_ascii=False),aid))
             if 'auto_sector' in d:c.execute('UPDATE assets SET auto_sector=? WHERE id=?',(int(d['auto_sector']),aid))
             if values[-1] in international_market.TYPES:
                 old_listing=latest(c,aid).get('international_listing')
@@ -1549,7 +1571,7 @@ def mutate(path, d):
                 raise ValueError('Indicadores de stock inválidos.')
             if isinstance(d['asset_id'],bool):raise ValueError('Stock inválido.')
             aid=int(number(d['asset_id'],True,1));owner=c.execute('SELECT asset_type FROM assets WHERE id=? AND archived=0',(aid,)).fetchone()
-            if not owner or owner['asset_type'] not in ('foreign','global_stock'):raise ValueError('Escolha um stock cadastrado.')
+            if not owner or owner['asset_type'] not in ('foreign','global_stock','bdr'):raise ValueError('Escolha um stock cadastrado.')
             ref=valid_date(d['asof']);source=text_value(d['source'],300,True)
             if ref>today().isoformat() or d['currency'] not in stock_fundamentals.CURRENCIES:raise ValueError('Data ou moeda inválida.')
             values={}
@@ -1563,7 +1585,7 @@ def mutate(path, d):
             if profile not in ('auto',*sector_analysis.COMPANY_PROFILES):
                 raise ValueError('Perfil de empresa inválido.')
             issuer=c.execute('SELECT asset_type FROM assets WHERE id=?',(int(d['id']),)).fetchone()
-            if not issuer or issuer['asset_type'] not in ('stock','foreign','global_stock'): raise ValueError('Perfil de empresa disponível apenas para ações e stocks.')
+            if not issuer or issuer['asset_type'] not in ('stock','foreign','global_stock','bdr'): raise ValueError('Perfil de empresa disponível apenas para ações e stocks.')
             c.execute('UPDATE assets SET research_profile=? WHERE id=?', (profile,int(d['id'])))
         elif path == '/api/income':
             values = validate_income(d)
@@ -1884,13 +1906,17 @@ class Handler(BaseHTTPRequestHandler):
                  '/fixed-income.js': ('fixed-income.js', 'application/javascript'),
                  '/investment-context.js': ('investment-context.js', 'application/javascript'),
                  '/b3-sync.js': ('b3-sync.js', 'application/javascript'),
+                 '/b3-fixed.js': ('b3-fixed.js', 'application/javascript'),
+                 '/b3-notes.js': ('b3-notes.js', 'application/javascript'),
+                 '/b3-pluggy.js': ('b3-pluggy.js', 'application/javascript'),
                  '/positions.js': ('positions.js', 'application/javascript'),
                  '/signals.js': ('signals.js', 'application/javascript'),
                  '/models.js': ('models.js', 'application/javascript'),
                  '/us.js': ('us.js', 'application/javascript'),
                  '/security.js': ('security.js', 'application/javascript'),
                  '/installer.js': ('installer.js', 'application/javascript'),
-                 '/style.css': ('style.css', 'text/css'), '/favicon.svg': ('favicon.svg', 'image/svg+xml')}
+                 '/style.css': ('style.css', 'text/css'), '/themes.css': ('themes.css', 'text/css'),
+                 '/themes.js': ('themes.js', 'application/javascript'), '/favicon.svg': ('favicon.svg', 'image/svg+xml')}
         if path in files:
             fn, typ = files[path]
             return self.respond((ROOT / 'static' / fn).read_bytes(), content_type=typ+'; charset=utf-8')
@@ -2010,6 +2036,18 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/b3/preview':
                 import b3_import
                 return self.respond(b3_import.preview(__import__(__name__), d))
+            if path == '/api/notes/parse':
+                import brokerage_notes
+                return self.respond(brokerage_notes.build(__import__(__name__), d))
+            if path == '/api/pluggy/read':
+                import pluggy_connector
+                return self.respond(pluggy_connector.read(__import__(__name__), d))
+            if path == '/api/b3/fixed-preview':
+                import fixed_position
+                return self.respond(fixed_position.preview(__import__(__name__), d))
+            if path == '/api/b3/fixed-commit':
+                import fixed_position
+                return self.respond(fixed_position.commit(__import__(__name__), d))
             if path == '/api/b3/position-check':
                 import b3_position
                 return self.respond(b3_position.check(__import__(__name__), d))

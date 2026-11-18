@@ -4,7 +4,7 @@ const buyHoldDetail = detail, buyHoldPoll = aiPoll;
 const companyTabs = new Map();
 const companyCheckFilters = new Map();
 const companyTabLabels = {company:'Análise completa',history:'Histórico financeiro',drivers:'Mercado e notícias',online:'Opiniões online'};
-const bhSymbol = a => a.ticker + (a.asset_type === 'stock' ? '.SA' : '');
+const bhSymbol = a => a.asset_type==='bdr'?(a.bdr?.listing.symbol||a.ticker+'.SA'):a.ticker+(a.asset_type==='stock'?'.SA':'');
 
 function companyViability(a) {
  const r=a.company_research.study,gov=a.company_research.governance?.data;
@@ -95,7 +95,7 @@ detail=function(id) {
  buyHoldDetail(id);const a=assetById(id);if(!a?.company_research?.buy_hold)return;
  const body=$('#modal-body');body.querySelector('[data-issuer-id]')?.remove();
  const original=body.innerHTML;
- body.innerHTML=companyDossier(a)+`<details class="details-section company-existing-details"><summary>Indicadores por setor, posição e operações</summary>${original}</details>`;
+ body.innerHTML=(a.asset_type==='bdr'?bdrContext(a):'')+companyDossier(a)+`<details class="details-section company-existing-details"><summary>Indicadores por setor, posição e operações</summary>${original}</details>`;
  decorateIndicators(body);applyCompanyCheckFilter(a,body);$('#modal').scrollTop=0;
 };
 qualityOpen=function(id){detail(id);};

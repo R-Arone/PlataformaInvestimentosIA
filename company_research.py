@@ -9,7 +9,6 @@ import sector_analysis
 import company_history
 import company_model
 import factor_analysis
-
 KINDS = ('issuer_financials', 'issuer_report', 'issuer_review') + company_history.KINDS + company_model.KINDS + factor_analysis.KINDS
 FIELDS = {'annualNetIncome':'net_income', 'annualTotalRevenue':'revenue',
           'annualOperatingCashFlow':'operating_cashflow', 'annualFreeCashFlow':'free_cashflow'}
@@ -89,7 +88,7 @@ def validate_snapshot(app, kind, d):
 
 
 def annual_symbol(a):
-    return a['ticker'] if a['asset_type'] in ('foreign','global_stock') else a['ticker']+'.SA'
+    return company_history.symbol(a)
 
 
 def fetch_annual(app, a):
@@ -199,8 +198,9 @@ def inputs(app, a):
 
 
 def enrich(app,a):
-    if a['asset_type'] not in ('stock','foreign','global_stock'):
+    if a['asset_type'] not in ('stock','foreign','global_stock','bdr'):
         return
+    if a['asset_type']=='bdr' and not __import__('stock_fundamentals').bdr_listing(a):return
     data,digest=inputs(app,a)
     review=a['snapshots'].get('issuer_review')
     if review:
@@ -254,8 +254,9 @@ def validate_review(app,r,facts):
 
 def asset(app, aid):
     a=next((a for a in app.state()['assets'] if a['id']==aid),None)
-    if not a or a['asset_type'] not in ('stock','foreign','global_stock'):
-        raise ValueError('Escolha uma empresa cadastrada (ação brasileira ou stock).')
+    if not a or a['asset_type'] not in ('stock','foreign','global_stock','bdr'):
+        raise ValueError('Escolha uma empresa cadastrada (ação, stock ou BDR).')
+    if a['asset_type']=='bdr':__import__('stock_fundamentals').research_identity(a)
     return a
 
 
@@ -268,7 +269,7 @@ def save_annual(app,a,d):
     d=validate_snapshot(app,'issuer_financials',d)
     if d['symbol']!=annual_symbol(a):raise ValueError('Série anual de outro emissor.')
     with app.WRITE_LOCK, app.connect() as c:
-        owner=c.execute('SELECT ticker,asset_type FROM assets WHERE id=? AND archived=0',(a['id'],)).fetchone()
+        owner=c.execute('SELECT ticker,asset_type,bdr_listing FROM assets WHERE id=? AND archived=0',(a['id'],)).fetchone()
         if not owner:
             return
         if annual_symbol(dict(owner))!=d['symbol']:raise ValueError('A empresa mudou durante a consulta anual.')
@@ -302,6 +303,7 @@ def analyze(app,d):
         except ValueError as exc:
             warning=str(exc)
         a=asset(app,a['id'])
+    if a['asset_type']=='bdr' and not __import__('stock_fundamentals').bdr_listing(a):return
     data,digest=inputs(app,a)
     if warning:
         data['fetch_warning']=warning
@@ -351,7 +353,7 @@ def cr_annual_reading(annual):
 
 def queue_initial(app,c,aid):
     a=c.execute('SELECT asset_type FROM assets WHERE id=? AND archived=0',(aid,)).fetchone()
-    if not a or a['asset_type'] not in ('stock','foreign','global_stock'):
+    if not a or a['asset_type'] not in ('stock','foreign','global_stock','bdr'):
         return
     q=app.read_cache(c,'issuer_initial',{})
     q.setdefault(str(aid),'pending');app.write_cache(c,'issuer_initial',q)
@@ -366,7 +368,7 @@ def start_initial(app):
             if not app.read_cache(c,'issuer_auto',True):
                 return
             q=app.read_cache(c,'issuer_initial',{})
-            valid={str(r['id']) for r in c.execute("SELECT id FROM assets WHERE archived=0 AND asset_type IN ('stock','foreign','global_stock')")}
+            valid={str(r['id']) for r in c.execute("SELECT id FROM assets WHERE archived=0 AND asset_type IN ('stock','foreign','global_stock','bdr')")}
             aid=next((k for k,v in q.items() if v=='pending' and k in valid and any(
                 s['data'].get(metric) is not None for kind,s in app.latest(c,int(k)).items()
                 if kind in ('financial','statistics','risk','public') or kind.startswith('metric:')
@@ -407,7 +409,7 @@ def action(app,path,d):
         if set(d)!=({'asset_id'} if reset else {'asset_id','criteria'}):raise ValueError('Pedido de critérios inválido.')
         payload=factor_analysis.validate_scope(app,dict(symbol=annual_symbol(a),market=factor_analysis.market(a),asof=app.today().isoformat(),criteria=[] if reset else d['criteria'],**({'automatic':True} if reset else {})))
         with app.WRITE_LOCK,app.connect() as c:
-            owner=c.execute('SELECT ticker,asset_type FROM assets WHERE id=? AND archived=0',(a['id'],)).fetchone()
+            owner=c.execute('SELECT ticker,asset_type,bdr_listing FROM assets WHERE id=? AND archived=0',(a['id'],)).fetchone()
             if not owner or annual_symbol(dict(owner))!=payload['symbol']:raise ValueError('A empresa mudou durante a seleção.')
             app.add_snapshot(c,a['id'],factor_analysis.KINDS[2],payload,'Manual · ligação entre critérios e negócio',payload['asof'])
         return {'ok':True}
@@ -420,7 +422,7 @@ def action(app,path,d):
             raise ValueError('Pedido de premissas inválido.')
         payload = company_model.validate_snapshot(app, dict(symbol=annual_symbol(a), asof=app.today().isoformat(), parameters=d['parameters']))
         with app.WRITE_LOCK, app.connect() as c:
-            owner = c.execute('SELECT ticker,asset_type FROM assets WHERE id=? AND archived=0', (a['id'],)).fetchone()
+            owner = c.execute('SELECT ticker,asset_type,bdr_listing FROM assets WHERE id=? AND archived=0', (a['id'],)).fetchone()
             if not owner or annual_symbol(dict(owner)) != payload['symbol']:
                 raise ValueError('A empresa mudou durante o cálculo.')
             app.add_snapshot(c, a['id'], company_model.KINDS[0], payload, 'Manual · premissas do modelo fundamental', payload['asof'])

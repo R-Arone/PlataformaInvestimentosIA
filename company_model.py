@@ -10,7 +10,6 @@ import re
 
 import sector_analysis
 import stock_fundamentals
-
 KINDS = ('issuer_model_assumptions',)
 DEFAULTS = dict(cost_of_equity=None, long_growth=3.0, sustainable_roe=None,
                 revenue_shock=-20.0, variable_cost_share=70.0,
@@ -226,5 +225,5 @@ def analyze(app, a):
 
 
 def enrich(app, a):
-    if a['asset_type'] in ('stock', 'foreign', 'global_stock'):
+    if a['asset_type'] in ('stock', 'foreign', 'global_stock', 'bdr'):
         a['company_research']['fundamental_model'] = analyze(app, a)

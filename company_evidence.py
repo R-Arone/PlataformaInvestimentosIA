@@ -7,7 +7,6 @@ from datetime import date
 import math
 import business_drivers
 import quality_evidence
-
 EPISODES = (
     ('financial_2008', 'Crise financeira de 2008', '2007-09', '2007-10', '2009-06'),
     ('covid_2020', 'Pandemia de 2020', '2020-01', '2020-02', '2020-06'),
@@ -88,7 +87,7 @@ def context(a,day):
     age=lambda ref:(day-date.fromisoformat(str(ref)[:10])).days
     operating=business_drivers.active(a,age)
     facts=[dict(text=r['segment']+' · '+('participação '+str(r['share'])+'% · ' if r['share'] is not None else 'participação não documentada · ')+r['basis']+' · '+r['mechanism'],asof=r['asof'],source_url=r['source_url']) for r in operating]+facts
-    return dict(asof=day.isoformat(),currency=factor.get('currency') or ('USD' if a.get('asset_type')=='foreign' else 'BRL'),
+    return dict(asof=day.isoformat(),currency=factor.get('currency') or (a.get('company_research',{}).get('annual') or {}).get('currency') or ('USD' if a.get('asset_type')=='foreign' else a.get('bdr',{}).get('listing',{}).get('currency','BRL')),
         quality=quality.get('status','incomplete'),quality_counts=quality.get('counts',{'pass':0,'fail':0,'unknown':0,'na':0}),
         failed_checks=[r['label'] for r in quality.get('checks',[]) if r['status']=='fail'][:8],
         valuation=base.get('classification','unknown'),valuation_pvp=base.get('pvp'),

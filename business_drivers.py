@@ -6,7 +6,6 @@ import re
 from datetime import datetime
 import market_ai
 import market_brief
-
 KIND='issuer_business_drivers'
 FACTORS={'rates':'Juros','inflation':'Inflação','usd':'Dólar','brent':'Petróleo','iron':'Minério de ferro','copper':'Cobre','soy':'Soja','activity':'Atividade econômica',
          'household_credit':'Crédito e inadimplência de pessoas físicas','corporate_credit':'Crédito e inadimplência de empresas','agro_credit':'Crédito e inadimplência no agronegócio'}
@@ -42,7 +41,8 @@ def validate_snapshot(app,d):
 
 
 def generate(app,d):
-    import company_research,company_history
+    import company_research
+    import company_history
     a=company_research.asset(app,d['asset_id']);scope=str(app.DB_PATH);before=fingerprint(a)
     name=a.get('snapshots',{}).get('issuer_profile',{}).get('data',{}).get('name') or a['ticker']
     identity=name+' '+a['ticker']
@@ -87,7 +87,7 @@ def validate_request(app,d):
     import company_research
     if not isinstance(d,dict) or set(d)!={'asset_id'} or type(d['asset_id']) is not int:raise ValueError('Escolha uma empresa para pesquisar o negócio.')
     a=company_research.asset(app,d['asset_id'])
-    if a['asset_type'] not in ('stock','foreign','global_stock'):raise ValueError('O mapa operacional se aplica a empresas.')
+    if a['asset_type'] not in ('stock','foreign','global_stock','bdr'):raise ValueError('O mapa operacional se aplica a empresas.')
     return dict(d)
 
 

@@ -1,13 +1,13 @@
 """Public stock identity and dated financial inputs, separate from the BRL ledger."""
 from datetime import datetime, timezone, timedelta
 import math
+import json
 import urllib.parse
 
 import international_market
 import sector_analysis
 import us_market
-
-KINDS=('stock_profile','stock_financials')
+KINDS=('stock_profile','stock_financials','bdr_underlying_quote')
 FIELDS={
  'trailingDilutedEPS':'eps', 'trailingNetIncome':'net_income',
  'trailingTotalRevenue':'revenue','trailingOperatingIncome':'ebit',
@@ -19,7 +19,32 @@ FIELDS={
 CURRENCIES={'BRL','USD','EUR','GBP','JPY','CAD','CHF','AUD','TWD','HKD','CNY','INR','KRW','SEK','NOK','DKK','ZAR','MXN','ILS','SGD'}
 
 
+def bdr_listing(a):
+    raw=a.get('bdr_listing','{}')
+    return json.loads(raw) if isinstance(raw,str) else raw
+
+
+def validate_bdr_listing(app,d):
+    if not isinstance(d,dict) or set(d)!={'symbol','market','currency','source_url','asof'}:
+        raise ValueError('Informe ticker, bolsa, moeda, fonte e data da empresa representada pelo BDR.')
+    ticker=symbol(d['symbol'],d['market']);ref=app.valid_date(d['asof'])
+    if d['currency'] not in international_market.MARKETS[d['market']]['currencies'] or ref>app.today().isoformat():
+        raise ValueError('Moeda ou data da empresa do BDR incompatível.')
+    url=app.validate_url(d['source_url'])
+    if not url:raise ValueError('Informe a fonte que confirma a empresa representada pelo BDR.')
+    return dict(symbol=ticker,market=d['market'],currency=d['currency'],source_url=url,asof=ref)
+
+
+def research_identity(a):
+    if a['asset_type']=='bdr':
+        listing=bdr_listing(a)
+        if not listing:raise ValueError('Vincule o BDR à empresa no exterior no cadastro para buscar fundamentos.')
+        return listing['symbol'],listing['market']
+    return a['ticker'],'US' if a['asset_type']=='foreign' else a.get('international',{}).get('listing',{}).get('market')
+
+
 def symbol(ticker,market='US'):
+    if not isinstance(market,str) or market not in international_market.MARKETS:raise ValueError('Bolsa da empresa inválida.')
     return us_market.symbol(ticker) if market=='US' else international_market.symbol(ticker,market)
 
 
@@ -62,6 +87,7 @@ def lookup(app,ticker,market='US'):
 
 def validate_snapshot(app,kind,d):
     if not isinstance(d,dict):raise ValueError('Pesquisa de stock inválida.')
+    if kind=='bdr_underlying_quote':return international_market.validate_snapshot(app,'international_quote',d)
     if kind=='stock_profile':
         if set(d)!={'symbol','market','name','sector_original','industry','sector','source_url'}:
             raise ValueError('Identificação de stock incompleta.')
@@ -161,11 +187,15 @@ def derive(data,quote,age):
 
 
 def native_quote(a):
-    return a.get('snapshots',{}).get('us_quote' if a['asset_type']=='foreign' else 'international_quote')
+    return a.get('snapshots',{}).get('bdr_underlying_quote' if a['asset_type']=='bdr' else 'us_quote' if a['asset_type']=='foreign' else 'international_quote')
 
 
 def enrich(a,age):
-    if a['asset_type'] not in ('foreign','global_stock'):return
+    if a['asset_type'] not in ('foreign','global_stock','bdr'):return
+    if a['asset_type']=='bdr':
+        a['bdr']={'listing':bdr_listing(a),'quote':native_quote(a),
+            'note':'Fundamentos, múltiplos e correlações referem-se à ação da empresa no exterior, na moeda indicada. A cotação e a posição do BDR são em BRL. Paridade, câmbio e custos do programa podem alterar o retorno do recibo.'}
+        if not a['bdr']['listing']:return
     snaps=a['snapshots'];p=snaps.get('stock_profile');f=snaps.get('stock_financials');q=native_quote(a)
     metrics=derive(f['data'],q,age) if f else {}
     a['stock_research']={'profile':p,'financials':f,'metrics':metrics,
@@ -175,27 +205,38 @@ def enrich(a,age):
 
 
 def refresh_asset(app,a,force=False):
-    market='US' if a['asset_type']=='foreign' else a.get('international',{}).get('listing',{}).get('market')
+    ticker,market=research_identity(a)
     if not market:
         with app.connect() as c:market=app.latest(c,a['id']).get('international_listing',{}).get('data',{}).get('market')
-    ticker=symbol(a['ticker'],market);warnings=[]
+    ticker=symbol(ticker,market);warnings=[]
     with app.connect() as c:old=app.latest(c,a['id'])
-    for kind,loader,ttl in (('stock_profile',lambda:lookup(app,ticker,market),7),('stock_financials',lambda:fetch(app,ticker,market),1)):
+    loaders=[('stock_profile',lambda:lookup(app,ticker,market),7),('stock_financials',lambda:fetch(app,ticker,market),1)]
+    quote_refs={}
+    if a['asset_type']=='bdr':
+        def load_quote():
+            raw=app.request_json('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?range=5d&interval=1d')
+            data,ref=international_market.parse_quote(app,a,bdr_listing(a),raw)
+            quote_refs['asof']=ref
+            return {**data}
+        loaders.insert(0,('bdr_underlying_quote',load_quote,0))
+    for kind,loader,ttl in loaders:
         if not force and old.get(kind) and app.age(old[kind]['retrieved_at'])<ttl:continue
         try:
-            data=loader();ref=app.today().isoformat() if kind=='stock_profile' else max(r['date'] for r in data['series'])
+            data=loader();ref=quote_refs['asof'] if kind=='bdr_underlying_quote' else app.today().isoformat() if kind=='stock_profile' else max(r['date'] for r in data['series'])
             with app.WRITE_LOCK,app.connect() as c:
                 current=c.execute('SELECT * FROM assets WHERE id=?',(a['id'],)).fetchone()
                 if not current or current['archived'] or current['ticker']!=a['ticker'] or current['asset_type']!=a['asset_type']:
                     raise ValueError('Cadastro alterado durante a consulta; tente novamente.')
                 if a['asset_type']=='global_stock' and app.latest(c,a['id']).get('international_listing',{}).get('data',{}).get('market')!=market:
                     raise ValueError('Bolsa alterada durante a consulta.')
+                if a['asset_type']=='bdr' and bdr_listing(dict(current))!=bdr_listing(a):
+                    raise ValueError('Vínculo do BDR alterado durante a consulta.')
                 app.add_snapshot(c,a['id'],kind,data,'Yahoo Finance · stocks/'+ticker,ref)
                 if kind=='stock_profile' and current['auto_sector']:
                     if data['sector']!='Não classificado':c.execute('UPDATE assets SET sector=? WHERE id=?',(data['sector'],a['id']))
                     previous=old.get(kind,{}).get('data',{}).get('name')
                     if current['name'] in (a['ticker'],previous):c.execute('UPDATE assets SET name=? WHERE id=?',(data['name'],a['id']))
-                app.log_source(c,kind+'_'+str(a['id']),a['ticker']+' · '+('setor e indústria' if kind=='stock_profile' else 'indicadores'),data['source_url'],asof=ref)
+                app.log_source(c,kind+'_'+str(a['id']),a['ticker']+' · '+('setor e indústria' if kind=='stock_profile' else 'cotação da empresa' if kind=='bdr_underlying_quote' else 'indicadores'),data.get('source_url','https://finance.yahoo.com/quote/'+ticker+'/'),asof=ref)
         except ValueError as exc:
             warnings.append(str(exc))
             with app.WRITE_LOCK,app.connect() as c:app.log_source(c,kind+'_'+str(a['id']),a['ticker']+' · pesquisa pública',

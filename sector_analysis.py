@@ -125,12 +125,12 @@ def fold(s):
 
 def profile(a):
     explicit = a.get('research_profile','auto')
-    if explicit in COMPANY_PROFILES and a.get('asset_type','stock') in ('stock','foreign','global_stock'):
+    if explicit in COMPANY_PROFILES and a.get('asset_type','stock') in ('stock','foreign','global_stock','bdr'):
         return explicit
     typ = a.get('asset_type','stock')
     if typ in ('fii','etf','crypto'): return typ
     if typ=='global_etf': return 'etf'
-    if typ=='bdr': return 'foreign'
+    if typ=='bdr' and not __import__('stock_fundamentals').bdr_listing(a): return 'foreign'
     sector = fold(a.get('sector',''))
     name = fold(a.get('name',''))
     if 'banco' in sector or 'banc' in name: return 'bank'
@@ -174,7 +174,7 @@ def metric(a, key, age):
             'data':{key:m['value'],'currency':m['currency']},'definition':m['definition'],
             'source':f['source']+' · '+m['definition']}
         if key in ('pe','pvp'):
-            quote=a['snapshots'].get('us_quote' if a['asset_type']=='foreign' else 'international_quote',{})
+            quote=__import__('stock_fundamentals').native_quote(a) or {}
             snapshot['retrieved_at']=quote.get('retrieved_at',snapshot['retrieved_at'])
         candidates.append((snapshot,m['value']))
     for kind in ('metric:'+key, 'risk', 'public', METRICS[key][2], *(['statistics'] if key in ('eps','bvps') else [])):
@@ -235,7 +235,7 @@ def analyze(assets,cfg,macros,age):
                 basis,_,_=metric(a,'lease_consistent',age)
                 if basis!=1: v=None; reason='Confirme que dívida e EBITDA usam a mesma base de arrendamentos (IFRS 16).'
             status='unknown' if v is None or limit is None else 'pass' if (v<=limit if op in ('le','peer') else v>=limit if op=='ge' else v>limit) else 'fail'
-            checks.append({'metric':key,'label':label or METRICS[key][0], 'unit':(s.get('data',{}).get('currency','BRL') if s else a.get('snapshots',{}).get('issuer_financials',{}).get('data',{}).get('currency',a.get('international',{}).get('listing',{}).get('currency','USD'))) if METRICS[key][1]=='R$' and a['asset_type'] in ('foreign','global_stock') else METRICS[key][1],
+            checks.append({'metric':key,'label':label or METRICS[key][0], 'unit':(s.get('data',{}).get('currency','BRL') if s else a.get('snapshots',{}).get('issuer_financials',{}).get('data',{}).get('currency',a.get('international',{}).get('listing',{}).get('currency','USD'))) if METRICS[key][1]=='R$' and a['asset_type'] in ('foreign','global_stock','bdr') else METRICS[key][1],
                 'value':v,'limit':limit,'operator':op,'status':status,'reason':reason if status=='unknown' else explanation,
                 'references':refs,'median':med,'peers':peers,'note':explanation,
                 'group':'valuation' if op=='peer' else 'health'})
@@ -273,10 +273,10 @@ def analyze(assets,cfg,macros,age):
             typ=fii_research.subtype(a)
             check('distribution_cover','ge',1,'Resultado recorrente cobre a distribuição','Usar a mesma janela de resultado e distribuição; o resultado financeiro com vendas não comprova recorrência.')
         risks=p['risks']
-        if a['asset_type'] in ('foreign','global_stock'):
+        if a['asset_type'] in ('foreign','global_stock','bdr'):
             risks=[x.replace('no Brasil','no mercado da empresa') for x in risks]+['Limites de estudo por negócio; confirmar contabilidade, moeda e exigência do regulador do país. O ROE não é comparado à Selic brasileira.']
         a['sector_analysis']={'profile':ident,'label':p['label'],'risks':risks,'checks':checks,
-            'references':[r for r in REFERENCES if r['id'] in p['refs'] and (a['asset_type'] not in ('foreign','global_stock') or r['id'] not in ('bcb','susep'))],
+            'references':[r for r in REFERENCES if r['id'] in p['refs'] and (a['asset_type'] not in ('foreign','global_stock','bdr') or r['id'] not in ('bcb','susep'))],
             'counts':{status:sum(x['status']==status and x['group']=='health' for x in checks) for status in ('pass','fail','unknown')},
             'valuation_counts':{status:sum(x['status']==status and x['group']!='health' for x in checks) for status in ('pass','fail','unknown')}}
     return assets

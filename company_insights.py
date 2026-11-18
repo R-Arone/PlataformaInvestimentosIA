@@ -12,7 +12,6 @@ import urllib.request
 
 import market_outlook
 import sector_analysis
-
 KINDS = ('issuer_statements', 'issuer_governance', 'issuer_drivers', 'issuer_exposure')
 FLOW = ('net_income', 'revenue', 'gross_profit', 'cost_of_revenue', 'ebit', 'ebitda', 'interest_expense', 'operating_cashflow', 'free_cashflow')
 BALANCE = ('equity', 'debt', 'cash', 'current_assets', 'current_liabilities', 'inventory')
@@ -609,7 +608,7 @@ def fetch_drivers(app, a):
         observations[k].update(unit='% a.a.' if k == 'rates' else 'R$/US$', frequency='daily')
     exposure = a.get('snapshots', {}).get('issuer_exposure', {}).get('data', {})
     keys = exposure.get('commodities', suggested_commodities(a))
-    if a['asset_type'] in ('foreign', 'global_stock'): keys = keys+['us_rates']
+    if a['asset_type'] in ('foreign', 'global_stock', 'bdr'): keys = keys+['us_rates']
     # Keep observations only for the selected benchmarks, including failures preserved above.
     observations = {k: v for k, v in observations.items() if k in ('rates', 'usd', *keys)}
     with ThreadPoolExecutor(max_workers=3) as pool:
@@ -625,7 +624,7 @@ def drivers(app, a):
     snaps = a.get('snapshots', {}); snapshot = snaps.get('issuer_drivers'); exposure = snaps.get('issuer_exposure', {}).get('data', {})
     observations = snapshot.get('data', {}).get('observations', {}) if snapshot else {}; rows = []
     keys = ['rates', 'usd'] + exposure.get('commodities', suggested_commodities(a))
-    if a['asset_type'] in ('foreign', 'global_stock'): keys.append('us_rates')
+    if a['asset_type'] in ('foreign', 'global_stock', 'bdr'): keys.append('us_rates')
     for key in keys:
         obs = observations.get(key); fresh = bool(obs) and app.age(obs['asof']) <= (100 if obs['frequency'] == 'monthly' else 7)
         label = {'rates': 'Selic meta', 'usd': 'Dólar PTAX'}.get(key) or BENCHMARKS[key][0]

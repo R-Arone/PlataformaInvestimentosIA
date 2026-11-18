@@ -174,12 +174,12 @@ document.addEventListener('click',e=>{
  const b=e.target.closest('[data-action="company-batch-open"]');if(!b)return;
  const panel=b.closest('.company-panel,.stocks-panel'),selectors=b.dataset.scope==='stocks'?'[data-action="stock-detail"][data-id]':'.company-research-tile .ticker-btn[data-id]';
  sensitivityBatchIds=[...new Set([...panel.querySelectorAll(selectors)].map(el=>Number(el.dataset.id)))];
- const all=S.assets.filter(a=>['stock','foreign','global_stock'].includes(a.asset_type));
+ const all=S.assets.filter(a=>['stock','foreign','global_stock','bdr'].includes(a.asset_type));
  modal('Analisar empresas em lote',`<form id="company-batch-form"><p>Atualiza indicadores, ficha, balanços e publicações das empresas selecionadas, depois compara fatores históricos, qualidade, hipóteses de valor e recuperação em crises. A leitura qualitativa pela IA é opcional. O progresso aparece na tela e as falhas ficam separadas por empresa.</p><div class="form-grid">${select('scope','Empresas para analisar',[['visible',`Empresas deste filtro (${sensitivityBatchIds.length})`],['all',`Todas as empresas cadastradas (${all.length})`]],sensitivityBatchIds.length?'visible':'all')}${select('years','Histórico dos fatores e crises',[[5,'5 anos'],[10,'10 anos'],[20,'20 anos']],10)}</div><label class="check-line"><input name="refresh" type="checkbox" checked> Atualizar fontes públicas e buscar dados faltantes</label><label class="check-line"><input name="use_ai" type="checkbox"> Explicar resultados e riscos com a IA local configurada</label><p class="form-hint">Sem atualizar fontes, usa somente os dados já salvos. A janela maior depende da cobertura da empresa e do provedor. O lote usa as premissas que você já definiu; valores ainda sem premissas ficam pendentes. Ações globais fora dos EUA têm análise financeira, com cobertura limitada de fatores e crises. Pode levar alguns minutos.</p><div class="form-error" role="alert"></div><div class="form-footer"><button class="button" type="submit">Iniciar análise da lista</button></div></form>`);
 });
 const sensitivityBatchBindBefore=bindForms;
 bindForms=function(...args){sensitivityBatchBindBefore(...args);wireForm('#company-batch-form',async(d,f)=>{
- const ids=d.scope==='all'?S.assets.filter(a=>['stock','foreign','global_stock'].includes(a.asset_type)).map(a=>a.id):sensitivityBatchIds;
+ const ids=d.scope==='all'?S.assets.filter(a=>['stock','foreign','global_stock','bdr'].includes(a.asset_type)).map(a=>a.id):sensitivityBatchIds;
  const job=await api('/api/issuer/batch',{asset_ids:ids,years:Number(d.years),refresh:f.querySelector('[name=refresh]').checked,use_ai:f.querySelector('[name=use_ai]').checked});
  S.ai.job=job;$('#modal').close();render();aiPoll();toast('Análise da lista iniciada. Acompanhe o progresso nesta tela.');
 });};
