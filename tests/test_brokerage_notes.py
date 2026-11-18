@@ -1,8 +1,8 @@
 import base64
 import io
 import unittest
-import b3_import
-import brokerage_notes as notes
+from aporte_brasil.importers import b3_import
+from aporte_brasil.importers import brokerage_notes as notes
 import test_app as baseline
 app=baseline.app
 

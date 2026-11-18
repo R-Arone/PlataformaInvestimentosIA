@@ -7,11 +7,11 @@ import unittest
 from unittest.mock import patch
 
 import test_app as baseline
-import company_history as history
-import company_insights as insights
-import company_research as research
-import sector_analysis
-import market_ai
+from aporte_brasil.company import company_history as history
+from aporte_brasil.company import company_insights as insights
+from aporte_brasil.company import company_research as research
+from aporte_brasil.portfolio import sector_analysis
+from aporte_brasil.ai import market_ai
 
 app = baseline.app
 
@@ -164,7 +164,7 @@ class CompanyInsightsTests(unittest.TestCase):
         aid=self.asset();a=app.state()['assets'][0]
         def fetch(a,ep,token):
             return ('financial',{'roe':15},'') if ep=='financial-data' else ('statistics',{'pvp':1.5},self.day) if ep=='statistics' else ('quote',{'price':20},self.day)
-        with patch.object(app,'fetch_stock',side_effect=fetch),patch('public_fundamentals.fetch_detail',side_effect=ValueError('Sem cobertura')):
+        with patch.object(app,'fetch_stock',side_effect=fetch),patch('aporte_brasil.company.public_fundamentals.fetch_detail',side_effect=ValueError('Sem cobertura')):
             result=history.refresh_current(app,a)
         a=app.state()['assets'][0]
         self.assertIn('financial',result['received']);self.assertEqual(a['sector_metrics']['roe']['value'],15)

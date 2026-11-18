@@ -4,9 +4,9 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-import bayesian_signals as bayes
-import market_signals as signals
-import portfolio_coupling as coupling
+from aporte_brasil.market import bayesian_signals as bayes
+from aporte_brasil.market import market_signals as signals
+from aporte_brasil.portfolio import portfolio_coupling as coupling
 from test_signals import series, asset
 import test_signals as existing
 from test_app import app

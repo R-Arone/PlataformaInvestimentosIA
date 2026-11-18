@@ -5,8 +5,8 @@ import json
 import unittest
 import zipfile
 from xml.sax.saxutils import escape
-import b3_import
-import funds
+from aporte_brasil.importers import b3_import
+from aporte_brasil.company import funds
 import test_app as baseline
 from unittest.mock import patch
 app=baseline.app

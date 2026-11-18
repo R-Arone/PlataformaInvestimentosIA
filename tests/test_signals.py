@@ -5,11 +5,11 @@ import math
 import unittest
 from unittest.mock import patch
 
-import market_signals as signals
-import portfolio_coupling as coupling
-import market_outlook
-import market_brief
-import sector_analysis
+from aporte_brasil.market import market_signals as signals
+from aporte_brasil.portfolio import portfolio_coupling as coupling
+from aporte_brasil.market import market_outlook
+from aporte_brasil.market import market_brief
+from aporte_brasil.portfolio import sector_analysis
 import test_app as baseline
 app = baseline.app
 

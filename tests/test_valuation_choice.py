@@ -3,14 +3,14 @@ import copy
 from datetime import date
 import unittest
 from unittest.mock import patch
-import company_history
-import company_registry
-import company_research
-import history_cache
-import investment_value
-import market_ai
-import valuation
-import valuation_history
+from aporte_brasil.company import company_history
+from aporte_brasil.company import company_registry
+from aporte_brasil.company import company_research
+from aporte_brasil.core import history_cache
+from aporte_brasil.portfolio import investment_value
+from aporte_brasil.ai import market_ai
+from aporte_brasil.company import valuation
+from aporte_brasil.company import valuation_history
 import test_app as baseline
 
 app=baseline.app

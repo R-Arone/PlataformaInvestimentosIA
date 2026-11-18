@@ -2,7 +2,9 @@ import copy,json,unittest
 from datetime import date,timedelta
 from unittest.mock import patch
 import test_app as baseline
-import market_brief,market_outlook as outlook,research_exchange as exchange
+from aporte_brasil.market import market_brief
+from aporte_brasil.market import market_outlook as outlook
+from aporte_brasil.importers import research_exchange as exchange
 app=baseline.app
 
 class OutlookTests(unittest.TestCase):

@@ -1,16 +1,12 @@
 from datetime import date
 from pathlib import Path
-import importlib.util
 import json
 import sys
 import unittest
 
 ROOT = Path(__file__).absolute().parents[1]
 sys.path.insert(0, str(ROOT))
-spec = importlib.util.spec_from_file_location('fixed_income', ROOT / 'fixed_income.py')
-fi = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = fi
-spec.loader.exec_module(fi)
+from aporte_brasil.portfolio import fixed_income as fi
 
 TODAY = date(2026, 11, 17)
 YEAR = 365.25

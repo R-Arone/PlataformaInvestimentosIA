@@ -1,7 +1,11 @@
 import copy,json,unittest
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
-import b3_import,extra_sources,research_exchange,sector_analysis,valuation
+from aporte_brasil.importers import b3_import
+from aporte_brasil.market import extra_sources
+from aporte_brasil.importers import research_exchange
+from aporte_brasil.portfolio import sector_analysis
+from aporte_brasil.company import valuation
 import test_app as baseline
 app=baseline.app
 

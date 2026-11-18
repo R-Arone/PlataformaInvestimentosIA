@@ -1,17 +1,14 @@
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-import importlib.util
 import json
 import sys
 import threading
 import unittest
 
 ROOT = Path(__file__).absolute().parents[1]
-spec = importlib.util.spec_from_file_location('benchmark_prices', ROOT / 'benchmark_prices.py')
-bp = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = bp
-spec.loader.exec_module(bp)
+sys.path.insert(0, str(ROOT))
+from aporte_brasil.market import benchmark_prices as bp
 
 TODAY = date(2026, 11, 17)
 

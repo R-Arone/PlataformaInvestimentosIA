@@ -3,10 +3,10 @@ import copy
 import json
 import unittest
 from unittest.mock import patch
-import company_research as cr
-import investment_exposure as x
-import market
-import market_ai as ai
+from aporte_brasil.company import company_research as cr
+from aporte_brasil.portfolio import investment_exposure as x
+from aporte_brasil.market import market
+from aporte_brasil.ai import market_ai as ai
 import test_app as baseline
 import test_ai as ai_tests
 app=baseline.app

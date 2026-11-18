@@ -21,7 +21,7 @@ class GitSafetyTests(unittest.TestCase):
         for name in ('data/carteira.sqlite3','carteira.aporteb','extrato.xlsx','operacoes.csv','backup.json','interface-v8.png','private/anything.py',
                      'static/model-comparison-data.json','static/private.json','tests/test_bayesian_live.py','packaging/Install.ps1'):
             self.assertFalse(safety.allowed(name),name)
-        for name in ('app.py','private_storage.py','static/security.js','.githooks/pre-push','SECURITY.md'):
+        for name in ('app.py','aporte_brasil/core/private_storage.py','static/security.js','.githooks/pre-push','SECURITY.md'):
             self.assertTrue(safety.allowed(name),name)
     def test_staged_private_file_refused_even_forced_into_index(self):
         (self.root/'data').mkdir();(self.root/'data/carteira.sqlite3').write_bytes(b'SQLite format 3\x00TEST')

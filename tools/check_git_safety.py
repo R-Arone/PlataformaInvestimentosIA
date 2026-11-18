@@ -7,36 +7,85 @@ import sys
 
 ROOT_FILES={'.gitignore','.gitattributes','README.md','SECURITY.md','requirements.txt','requirements-ai.txt','requirements-build.txt','Iniciar.ps1','Abrir Aporte Brasil.cmd','Reiniciar Aporte Brasil.cmd','Preparar Git.ps1'}
 ROOT_FILES.add('Encerrar.ps1')
-MODULES={'app.py','b3_import.py','bayesian_signals.py','csv_import.py','extra_sources.py','funds.py','history_cache.py','holdings.py','installer_builder.py','lifecycle.py','market.py','market_brief.py','market_outlook.py','market_ai.py','market_signals.py','portfolio_coupling.py','us_market.py','portfolio_strategy.py','public_fundamentals.py','research_exchange.py','sector_analysis.py','tax_rules.py','treasury_import.py','valuation.py','private_storage.py'}
+# Modulos de codigo publicaveis: app.py na raiz e o pacote aporte_brasil (um subpacote por area).
+MODULES={
+    'aporte_brasil/__init__.py',
+    'aporte_brasil/ai/__init__.py',
+    'aporte_brasil/ai/market_ai.py',
+    'aporte_brasil/ai/model_comparison.py',
+    'aporte_brasil/company/__init__.py',
+    'aporte_brasil/company/business_drivers.py',
+    'aporte_brasil/company/company_batch.py',
+    'aporte_brasil/company/company_completion.py',
+    'aporte_brasil/company/company_evidence.py',
+    'aporte_brasil/company/company_history.py',
+    'aporte_brasil/company/company_insights.py',
+    'aporte_brasil/company/company_model.py',
+    'aporte_brasil/company/company_quality.py',
+    'aporte_brasil/company/company_registry.py',
+    'aporte_brasil/company/company_research.py',
+    'aporte_brasil/company/corporate_events.py',
+    'aporte_brasil/company/factor_analysis.py',
+    'aporte_brasil/company/fii_quality.py',
+    'aporte_brasil/company/fii_research.py',
+    'aporte_brasil/company/funds.py',
+    'aporte_brasil/company/multiple_history.py',
+    'aporte_brasil/company/public_fundamentals.py',
+    'aporte_brasil/company/public_reports.py',
+    'aporte_brasil/company/quality_evidence.py',
+    'aporte_brasil/company/stock_fundamentals.py',
+    'aporte_brasil/company/valuation.py',
+    'aporte_brasil/company/valuation_history.py',
+    'aporte_brasil/core/__init__.py',
+    'aporte_brasil/core/desktop_notifications.py',
+    'aporte_brasil/core/history_cache.py',
+    'aporte_brasil/core/installer_builder.py',
+    'aporte_brasil/core/lifecycle.py',
+    'aporte_brasil/core/private_storage.py',
+    'aporte_brasil/importers/__init__.py',
+    'aporte_brasil/importers/b3_import.py',
+    'aporte_brasil/importers/b3_position.py',
+    'aporte_brasil/importers/brokerage_notes.py',
+    'aporte_brasil/importers/csv_import.py',
+    'aporte_brasil/importers/pluggy_connector.py',
+    'aporte_brasil/importers/research_exchange.py',
+    'aporte_brasil/importers/treasury_import.py',
+    'aporte_brasil/market/__init__.py',
+    'aporte_brasil/market/bayesian_signals.py',
+    'aporte_brasil/market/benchmark_prices.py',
+    'aporte_brasil/market/extra_sources.py',
+    'aporte_brasil/market/international_market.py',
+    'aporte_brasil/market/market.py',
+    'aporte_brasil/market/market_brief.py',
+    'aporte_brasil/market/market_monitor.py',
+    'aporte_brasil/market/market_news.py',
+    'aporte_brasil/market/market_outlook.py',
+    'aporte_brasil/market/market_research.py',
+    'aporte_brasil/market/market_signals.py',
+    'aporte_brasil/market/price_context.py',
+    'aporte_brasil/market/recommendation_signals.py',
+    'aporte_brasil/market/us_market.py',
+    'aporte_brasil/portfolio/__init__.py',
+    'aporte_brasil/portfolio/asset_correlation.py',
+    'aporte_brasil/portfolio/contrarian.py',
+    'aporte_brasil/portfolio/contribution_context.py',
+    'aporte_brasil/portfolio/fixed_income.py',
+    'aporte_brasil/portfolio/fixed_position.py',
+    'aporte_brasil/portfolio/holdings.py',
+    'aporte_brasil/portfolio/investment_decision.py',
+    'aporte_brasil/portfolio/investment_exposure.py',
+    'aporte_brasil/portfolio/investment_risk.py',
+    'aporte_brasil/portfolio/investment_value.py',
+    'aporte_brasil/portfolio/long_term.py',
+    'aporte_brasil/portfolio/portfolio_coupling.py',
+    'aporte_brasil/portfolio/portfolio_review.py',
+    'aporte_brasil/portfolio/portfolio_strategy.py',
+    'aporte_brasil/portfolio/sector_analysis.py',
+    'aporte_brasil/portfolio/tax_rules.py',
+    'aporte_brasil/portfolio/tesouro.py',
+    'app.py',
+}
 
-MODULES.add('investment_exposure.py')
-MODULES.add('company_research.py')
-MODULES.add('company_history.py')
-MODULES.add('company_insights.py')
-MODULES.update(('fii_research.py','public_reports.py'))
-MODULES.add('international_market.py')
-MODULES.update(('market_monitor.py','market_news.py','desktop_notifications.py'))
-MODULES.add('stock_fundamentals.py')
-MODULES.add('tesouro.py')
-MODULES.add('model_comparison.py')
-MODULES.add('company_model.py')
-MODULES.add('factor_analysis.py')
-MODULES.add('company_evidence.py')
-MODULES.add('company_batch.py')
-MODULES.add('company_quality.py')
-MODULES.add('fii_quality.py')
-MODULES.add('long_term.py')
-MODULES.add('recommendation_signals.py')
-MODULES.add('contrarian.py')
-MODULES.add('market_research.py')
-MODULES.update(('investment_value.py','investment_risk.py'))
-MODULES.add('company_completion.py')
-MODULES.update(('investment_decision.py','portfolio_review.py'))
-MODULES.update(('valuation_history.py','company_registry.py'))
-MODULES.update(('quality_evidence.py','business_drivers.py','contribution_context.py'))
-MODULES.update(('corporate_events.py','b3_position.py','brokerage_notes.py','fixed_position.py','pluggy_connector.py'))
-MODULES.add('multiple_history.py')
-MODULES.update(('price_context.py','asset_correlation.py','benchmark_prices.py','fixed_income.py'))
 ROOT_FILES.add('LONGO_PRAZO.md')
 
 # Ensaios dependentes de bases locais ou de ferramentas offline nao publicadas.

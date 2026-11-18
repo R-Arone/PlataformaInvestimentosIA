@@ -1,14 +1,11 @@
 from datetime import date, timedelta
 from pathlib import Path
-import importlib.util
 import json
 import sys
 import unittest
 
-spec = importlib.util.spec_from_file_location('price_context', Path(__file__).absolute().parents[1] / 'price_context.py')
-pc = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = pc
-spec.loader.exec_module(pc)
+sys.path.insert(0, str(Path(__file__).absolute().parents[1]))
+from aporte_brasil.market import price_context as pc
 
 TODAY = date(2026, 11, 17)
 

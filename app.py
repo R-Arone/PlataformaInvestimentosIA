@@ -22,48 +22,48 @@ import hashlib
 import time
 import sys
 from http.cookies import SimpleCookie
-import private_storage
-from market import (ASSET_TYPES, FIXED_TYPES, INSTITUTIONS, BASE_SECTORS, SOURCE_URLS,
+from aporte_brasil.core import private_storage
+from aporte_brasil.market.market import (ASSET_TYPES, FIXED_TYPES, INSTITUTIONS, BASE_SECTORS, SOURCE_URLS,
                     normalize_catalog, fetch_catalog, fetch_fii, fetch_fii_vacancy, fetch_bitcoin, fetch_sentiment,
                     source_href, fx_projection)
-import sector_analysis
-import public_fundamentals
-import tax_rules
-import market_brief
-import market_outlook
-import market_ai
-import extra_sources
-import valuation
-import research_exchange
-import investment_exposure
-import company_research
-import factor_analysis
-import fii_research
-import international_market
-import history_cache
-import multiple_history
-import price_context
-import asset_correlation
-import benchmark_prices
-import fixed_income
-import portfolio_strategy
-import long_term
-import investment_value
-import investment_risk
-import portfolio_review
-import quality_evidence
-import contrarian
-import holdings
-import portfolio_coupling
-import market_signals
-import model_comparison
-import market_monitor
-import stock_fundamentals
-import market_news
-import us_market
-import lifecycle
-import installer_builder
-import tesouro
+from aporte_brasil.portfolio import sector_analysis
+from aporte_brasil.company import public_fundamentals
+from aporte_brasil.portfolio import tax_rules
+from aporte_brasil.market import market_brief
+from aporte_brasil.market import market_outlook
+from aporte_brasil.ai import market_ai
+from aporte_brasil.market import extra_sources
+from aporte_brasil.company import valuation
+from aporte_brasil.importers import research_exchange
+from aporte_brasil.portfolio import investment_exposure
+from aporte_brasil.company import company_research
+from aporte_brasil.company import factor_analysis
+from aporte_brasil.company import fii_research
+from aporte_brasil.market import international_market
+from aporte_brasil.core import history_cache
+from aporte_brasil.company import multiple_history
+from aporte_brasil.market import price_context
+from aporte_brasil.portfolio import asset_correlation
+from aporte_brasil.market import benchmark_prices
+from aporte_brasil.portfolio import fixed_income
+from aporte_brasil.portfolio import portfolio_strategy
+from aporte_brasil.portfolio import long_term
+from aporte_brasil.portfolio import investment_value
+from aporte_brasil.portfolio import investment_risk
+from aporte_brasil.portfolio import portfolio_review
+from aporte_brasil.company import quality_evidence
+from aporte_brasil.portfolio import contrarian
+from aporte_brasil.portfolio import holdings
+from aporte_brasil.portfolio import portfolio_coupling
+from aporte_brasil.market import market_signals
+from aporte_brasil.ai import model_comparison
+from aporte_brasil.market import market_monitor
+from aporte_brasil.company import stock_fundamentals
+from aporte_brasil.market import market_news
+from aporte_brasil.market import us_market
+from aporte_brasil.core import lifecycle
+from aporte_brasil.core import installer_builder
+from aporte_brasil.portfolio import tesouro
 
 ROOT = Path(__file__).absolute().parent
 DB_PATH = Path(os.environ.get('APORTE_DB', str(private_storage.data_dir() / 'carteira.sqlite3')))
@@ -527,7 +527,7 @@ def state():
             a['sector_rating']=investment_risk.rating(a)
             a['risk_group']=investment_risk.group(a)
             if a.get('company_research'):
-                import company_completion
+                from aporte_brasil.company import company_completion
                 company_completion.enrich(sys.modules[__name__],a)
             a.pop('_statement_metrics', None)
             a.pop('_fii_metrics', None)
@@ -1236,7 +1236,7 @@ def restore(c, d):
         validate_url(f['source_url'])
         if not isinstance(json.loads(f['metadata']),dict) or len(f['metadata'])>5_000_000:
             raise ValueError('Pesquisa de fundo inválida no backup.')
-        import funds
+        from aporte_brasil.company import funds
         funds.validate_metadata(json.loads(f['metadata']), number, valid_date)
         if 'tesouro_position' in json.loads(f['metadata']):
             if f['type']!='Tesouro':raise ValueError('Posição de Tesouro em investimento incompatível.')
@@ -1715,7 +1715,7 @@ def validate_corporate_event(e, asset_ids):
 
 
 def validate_income(d):
-    import treasury_import
+    from aporte_brasil.importers import treasury_import
     ticker=text_value(d.get('ticker',''),200,True).upper()
     if not re.fullmatch(r'[A-Z0-9][A-Z0-9.\-]{0,14}',ticker) and not re.fullmatch(r'TESOURO [A-Z0-9+ ÁÉÍÓÚÇÃÕ\-]{1,180}',ticker) and not treasury_import.bank_product(ticker): raise ValueError('Código do ativo / título inválido.')
     if d.get('kind') not in ('Dividendos','JCP','Rendimentos','Reembolso','Amortização'): raise ValueError('Tipo de provento inválido.')
@@ -1729,7 +1729,7 @@ def validate_income(d):
 
 
 def fund_action(path,d):
-    import funds
+    from aporte_brasil.company import funds
     app=__import__(__name__)
     if path=='/api/funds/search': return funds.search(app,d)
     if path=='/api/funds/link':
@@ -1865,7 +1865,7 @@ class Handler(BaseHTTPRequestHandler):
             try:return self.respond(stock_fundamentals.lookup(sys.modules[__name__],query.get('ticker',[''])[0].strip().upper(),query.get('market',['US'])[0]))
             except (ValueError,KeyError,TypeError):return self.respond({'error':'Empresa ou setor não identificado. Confira ticker e bolsa; você pode preencher o setor manualmente.'},400)
         if path == '/api/csv/template':
-            from csv_import import template
+            from aporte_brasil.importers.csv_import import template
             kind = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('kind',['positions'])[0]
             try:
                 return self.respond(template(kind).encode('utf-8'), content_type='text/csv; charset=utf-8')
@@ -2028,28 +2028,28 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/catalog/refresh':
                 return self.respond(update_catalog())
             if path == '/api/csv/preview':
-                import csv_import
+                from aporte_brasil.importers import csv_import
                 return self.respond(csv_import.preview(__import__(__name__), d))
             if path == '/api/csv/commit':
-                import csv_import
+                from aporte_brasil.importers import csv_import
                 return self.respond(csv_import.commit(__import__(__name__), d))
             if path == '/api/b3/preview':
-                import b3_import
+                from aporte_brasil.importers import b3_import
                 return self.respond(b3_import.preview(__import__(__name__), d))
             if path == '/api/notes/parse':
-                import brokerage_notes
+                from aporte_brasil.importers import brokerage_notes
                 return self.respond(brokerage_notes.build(__import__(__name__), d))
             if path == '/api/pluggy/read':
-                import pluggy_connector
+                from aporte_brasil.importers import pluggy_connector
                 return self.respond(pluggy_connector.read(__import__(__name__), d))
             if path == '/api/b3/fixed-preview':
-                import fixed_position
+                from aporte_brasil.portfolio import fixed_position
                 return self.respond(fixed_position.preview(__import__(__name__), d))
             if path == '/api/b3/fixed-commit':
-                import fixed_position
+                from aporte_brasil.portfolio import fixed_position
                 return self.respond(fixed_position.commit(__import__(__name__), d))
             if path == '/api/b3/position-check':
-                import b3_position
+                from aporte_brasil.importers import b3_position
                 return self.respond(b3_position.check(__import__(__name__), d))
             if path == '/api/signals/analyze':return self.respond(market_signals.start(__import__(__name__),d))
             if path == '/api/allocation/plan':return self.respond(portfolio_strategy.plan(__import__(__name__),d))
@@ -2057,7 +2057,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/allocation/context':return self.respond(contrarian.refresh(__import__(__name__),d))
             if path == '/api/history/fetch':return self.respond(history_cache.fetch(__import__(__name__),d))
             if path == '/api/b3/commit':
-                import b3_import
+                from aporte_brasil.importers import b3_import
                 result=b3_import.commit(__import__(__name__), d)
                 if result['added']: result['refresh']=start_refresh()
                 return self.respond(result)

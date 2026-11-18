@@ -12,9 +12,9 @@ import unittest
 
 ROOT = Path(__file__).absolute().parents[1]
 sys.path.insert(0, str(ROOT))
-import asset_correlation
-import fixed_income
-import price_context
+from aporte_brasil.portfolio import asset_correlation
+from aporte_brasil.portfolio import fixed_income
+from aporte_brasil.market import price_context
 
 TODAY = date(2026, 11, 17)
 STAMP = '2026-11-17T22:00:00+00:00'

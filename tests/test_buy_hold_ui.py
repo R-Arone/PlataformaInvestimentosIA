@@ -7,10 +7,10 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app
-import company_history as history
-import company_research as research
-import company_insights as insights
-import market_ai
+from aporte_brasil.company import company_history as history
+from aporte_brasil.company import company_research as research
+from aporte_brasil.company import company_insights as insights
+from aporte_brasil.ai import market_ai
 
 
 def fixture():
@@ -79,7 +79,7 @@ def fixture():
         sentiments[profile]['method']='DEMONSTRAÇÃO FICTÍCIA. '+sentiments[profile]['method']
     with app.connect() as c:
         app.write_cache(c,'news_reports',reports);app.write_cache(c,'ai_sentiment',sentiments)
-    import fii_research
+    from aporte_brasil.company import fii_research
     from test_fii_research import fixture as fund_fixture
     for ticker,name,segment in [('TSTJ11','Imóveis Horizonte · FII fictício','Logística'),('TSTP11','Crédito Horizonte · FII fictício','Papel / recebíveis')]:
         with app.connect() as c:c.execute('INSERT INTO catalog VALUES (?,?,?,?,?,?,?)',(ticker,name,'fii',segment,0,'Fixture',app.now()))

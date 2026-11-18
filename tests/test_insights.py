@@ -3,10 +3,10 @@ import unittest
 from unittest.mock import patch
 import json
 import test_app as baseline
-import tax_rules
-import public_fundamentals as public
-import market_brief as news
-import sector_analysis
+from aporte_brasil.portfolio import tax_rules
+from aporte_brasil.company import public_fundamentals as public
+from aporte_brasil.market import market_brief as news
+from aporte_brasil.portfolio import sector_analysis
 app=baseline.app
 
 class InsightsTests(unittest.TestCase):

@@ -3,8 +3,8 @@ import copy
 from datetime import date,timedelta
 import unittest
 
-import fii_quality as quality
-import fii_research as fii
+from aporte_brasil.company import fii_quality as quality
+from aporte_brasil.company import fii_research as fii
 import test_app as baseline
 from test_fii_research import fixture
 

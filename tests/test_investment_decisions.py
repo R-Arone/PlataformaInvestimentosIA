@@ -6,11 +6,11 @@ import unittest
 from datetime import timedelta
 from unittest.mock import patch
 
-import investment_risk as risk
-import investment_value as value
-import long_term
-import portfolio_strategy
-import valuation
+from aporte_brasil.portfolio import investment_risk as risk
+from aporte_brasil.portfolio import investment_value as value
+from aporte_brasil.portfolio import long_term
+from aporte_brasil.portfolio import portfolio_strategy
+from aporte_brasil.company import valuation
 import test_app as baseline
 import test_long_term as examples
 import test_contrarian as contra

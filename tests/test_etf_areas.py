@@ -1,9 +1,9 @@
 """Only fictional holdings; public objectives are independent of the private wallet."""
 import copy
 import unittest
-import investment_exposure as exposure
-import market
-import portfolio_strategy
+from aporte_brasil.portfolio import investment_exposure as exposure
+from aporte_brasil.market import market
+from aporte_brasil.portfolio import portfolio_strategy
 import test_exposure as exposure_tests
 import test_app as baseline
 app=baseline.app

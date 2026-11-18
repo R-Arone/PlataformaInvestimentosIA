@@ -5,8 +5,8 @@ import math
 import unittest
 from unittest.mock import patch
 
-import bayesian_signals as bayes
-import market_signals as signals
+from aporte_brasil.market import bayesian_signals as bayes
+from aporte_brasil.market import market_signals as signals
 import test_signals as existing
 from test_signals import series
 

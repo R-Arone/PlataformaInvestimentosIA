@@ -63,15 +63,15 @@ class PreparationTests(unittest.TestCase):
 class FreshCheckoutTests(unittest.TestCase):
     def test_click_prepares_a_fresh_checkout_then_opens_offline(self):
         import cryptography
-        import private_storage
+        from aporte_brasil.core import private_storage
         with tempfile.TemporaryDirectory(dir=ROOT/'tests', prefix='tmp-test-') as folder:
             workspace = Path(folder)
             source = workspace/'author code'
             (source/'tools').mkdir(parents=True)
             for name in ('runtime_probe.py','prepare_runtime.py'):
                 shutil.copyfile(ROOT/'tools'/name, source/'tools'/name)
-            for name in ('Iniciar.ps1','lifecycle.py'):
-                shutil.copyfile(ROOT/name, source/name)
+            shutil.copyfile(ROOT/'Iniciar.ps1', source/'Iniciar.ps1')
+            shutil.copytree(ROOT/'aporte_brasil', source/'aporte_brasil', ignore=shutil.ignore_patterns('__pycache__'))
             # Use the installed version and disable indexes: this test downloads nothing.
             (source/'requirements.txt').write_text('cryptography=='+cryptography.__version__+'\ntzdata\n')
             (source/'.gitignore').write_text('.venv/\nopened.txt\n')

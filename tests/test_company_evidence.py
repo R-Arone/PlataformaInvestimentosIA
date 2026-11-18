@@ -5,10 +5,10 @@ import json
 import random
 import unittest
 from unittest.mock import patch
-import company_evidence as evidence
-import factor_analysis as factors
-import company_research
-import market_ai
+from aporte_brasil.company import company_evidence as evidence
+from aporte_brasil.company import factor_analysis as factors
+from aporte_brasil.company import company_research
+from aporte_brasil.ai import market_ai
 import test_app as baseline
 from test_factor_analysis import fixture, monthly_series
 import test_ai

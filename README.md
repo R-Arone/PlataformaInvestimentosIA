@@ -110,6 +110,19 @@ O `.gitignore` exclui dados, documentos, imagens, arquivos de ambiente e artefat
 
 Não adicione dados reais ao código, aos testes, aos commits ou às issues. A revisão automática é uma camada adicional e não substitui a revisão manual de conteúdo. Para separar uma nova cópia do código aprovado de uma instalação com dados locais, use `python tools/export_source.py CAMINHO_DE_UMA_PASTA_VAZIA`.
 
+## Estrutura do código
+
+`app.py` (servidor e entrada do aplicativo) fica na raiz, junto dos lançadores `.cmd`/`.ps1`. Os demais módulos ficam no pacote `aporte_brasil/`, um subpacote por área:
+
+- `core/`: cofre de dados privados, ciclo de vida do processo, instalador, cache de histórico e notificações.
+- `market/`: mercado, notícias, sinais, monitor, contexto de preços, benchmarks e fontes extras.
+- `ai/`: análise com IA local e comparação de modelos.
+- `company/`: pesquisa e qualidade de empresas e FIIs, fundamentos, valuation, múltiplos e eventos corporativos.
+- `portfolio/`: posições, estratégia de aporte, risco, exposição, correlação, longo prazo, tributação, Tesouro e renda fixa.
+- `importers/`: importação de B3, CSV, Tesouro, notas de corretagem, pesquisa colada e conector Pluggy.
+
+Novos módulos entram em `aporte_brasil/<área>/` e na lista `MODULES` de `tools/check_git_safety.py`, que é a lista de arquivos permitidos no Git. Os módulos se importam por `from aporte_brasil.<área> import <módulo>`.
+
 ## Testes
 
 ```powershell

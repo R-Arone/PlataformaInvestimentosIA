@@ -1,7 +1,11 @@
 import copy,json,unittest,base64
 from datetime import timedelta
 from unittest.mock import patch
-import b3_import,extra_sources,history_cache,portfolio_strategy,valuation
+from aporte_brasil.importers import b3_import
+from aporte_brasil.market import extra_sources
+from aporte_brasil.core import history_cache
+from aporte_brasil.portfolio import portfolio_strategy
+from aporte_brasil.company import valuation
 from test_research import workbook
 import test_app as baseline
 app=baseline.app

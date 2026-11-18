@@ -10,6 +10,7 @@ def approved_files():
     files=[p for p in root.iterdir() if allowed(p.name) and p.is_file()]
     for directory in ('static','tests','tools','packaging','.githooks'):
         files.extend(p for p in (root/directory).iterdir() if allowed(p.relative_to(root).as_posix()) and p.is_file())
+    files.extend(p for p in (root/'aporte_brasil').rglob('*.py') if allowed(p.relative_to(root).as_posix()))
     if any(p.is_symlink() or bool(getattr(p.lstat(),'st_file_attributes',0) & getattr(stat,'FILE_ATTRIBUTE_REPARSE_POINT',0x400))
            for source in files for p in (source,source.parent)):
         raise ValueError('A exportacao nao aceita links para outros arquivos ou pastas.')

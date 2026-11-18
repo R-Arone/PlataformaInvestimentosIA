@@ -4,7 +4,7 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from installer_builder import Builder
+from aporte_brasil.core.installer_builder import Builder
 
 if __name__=='__main__':
     builder=Builder(Path(__file__).resolve().parents[1])

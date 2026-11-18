@@ -1,6 +1,5 @@
 from datetime import date, timedelta
 from pathlib import Path
-import importlib.util
 import json
 import math
 import random
@@ -9,10 +8,7 @@ import unittest
 
 ROOT = Path(__file__).absolute().parents[1]
 sys.path.insert(0, str(ROOT))
-spec = importlib.util.spec_from_file_location('asset_correlation', ROOT / 'asset_correlation.py')
-ac = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = ac
-spec.loader.exec_module(ac)
+from aporte_brasil.portfolio import asset_correlation as ac
 
 TODAY = date(2026, 11, 17)
 STAMP = '2026-11-17T22:00:00+00:00'  # after the B3 close, so the last session counts

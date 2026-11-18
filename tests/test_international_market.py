@@ -5,10 +5,10 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
 import test_app as baseline
-import company_research as cr
-import international_market as im
-import investment_exposure as x
-import portfolio_strategy
+from aporte_brasil.company import company_research as cr
+from aporte_brasil.market import international_market as im
+from aporte_brasil.portfolio import investment_exposure as x
+from aporte_brasil.portfolio import portfolio_strategy
 app=baseline.app
 
 

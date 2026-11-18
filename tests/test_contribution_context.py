@@ -3,14 +3,14 @@ import copy
 import unittest
 from datetime import timedelta
 from unittest.mock import patch
-import business_drivers as business
-import contribution_context as context
-import quality_evidence
-import company_evidence
-import company_history
-import company_research
-import long_term
-import market_ai
+from aporte_brasil.company import business_drivers as business
+from aporte_brasil.portfolio import contribution_context as context
+from aporte_brasil.company import quality_evidence
+from aporte_brasil.company import company_evidence
+from aporte_brasil.company import company_history
+from aporte_brasil.company import company_research
+from aporte_brasil.portfolio import long_term
+from aporte_brasil.ai import market_ai
 import test_app as baseline
 import test_long_term as examples
 

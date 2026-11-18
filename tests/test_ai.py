@@ -8,7 +8,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-import market_ai as ai
+from aporte_brasil.ai import market_ai as ai
 import test_app as baseline
 app = baseline.app
 

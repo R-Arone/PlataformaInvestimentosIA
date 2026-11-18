@@ -1,6 +1,6 @@
 import unittest
-import b3_import
-import pluggy_connector as pc
+from aporte_brasil.importers import b3_import
+from aporte_brasil.importers import pluggy_connector as pc
 import test_app as baseline
 app=baseline.app
 CID='f8c9b8f0-b8e2-4f0f-b8e2-4f0f8e2f0f8e';ITEM='0d5a0de2-9c82-4ea2-af50-31643a632a33';INV='f77eccf4-7714-498e-92a9-1bebe70335d9'

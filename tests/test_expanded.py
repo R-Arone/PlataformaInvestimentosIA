@@ -1,7 +1,7 @@
 import json
 import sqlite3
-import csv_import
-import market
+from aporte_brasil.importers import csv_import
+from aporte_brasil.market import market
 import unittest
 import test_app as baseline
 from unittest.mock import patch

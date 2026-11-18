@@ -7,10 +7,10 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock,patch
 
-import desktop_notifications as desktop
-import market_monitor as monitor
-import market_news as news
-import valuation
+from aporte_brasil.core import desktop_notifications as desktop
+from aporte_brasil.market import market_monitor as monitor
+from aporte_brasil.market import market_news as news
+from aporte_brasil.company import valuation
 import test_signals as existing
 from test_app import app
 

@@ -4,10 +4,10 @@ from datetime import date, timedelta
 import unittest
 from unittest.mock import patch
 
-import company_quality as quality
-import company_history
-import company_insights
-import company_research
+from aporte_brasil.company import company_quality as quality
+from aporte_brasil.company import company_history
+from aporte_brasil.company import company_insights
+from aporte_brasil.company import company_research
 import test_app as baseline
 
 app = baseline.app

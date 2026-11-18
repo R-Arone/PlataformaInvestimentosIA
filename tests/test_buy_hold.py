@@ -5,8 +5,8 @@ import unittest
 from unittest.mock import patch
 
 import test_app as baseline
-import company_history as history
-import company_research as research
+from aporte_brasil.company import company_history as history
+from aporte_brasil.company import company_research as research
 
 app = baseline.app
 
@@ -151,7 +151,7 @@ class BuyHoldTests(unittest.TestCase):
 
     def test_failed_source_preserves_company_history_and_positions(self):
         aid = self.company(); a = app.state()['assets'][0]
-        with patch.object(app, 'request_json', side_effect=ValueError('Fonte indisponível')), patch('public_fundamentals.fetch_detail', side_effect=ValueError('Fonte indisponível')):
+        with patch.object(app, 'request_json', side_effect=ValueError('Fonte indisponível')), patch('aporte_brasil.company.public_fundamentals.fetch_detail', side_effect=ValueError('Fonte indisponível')):
             result = history.refresh(app, a)
         self.assertGreaterEqual(len(result['warnings']), 3)
         self.assertEqual(a['snapshots']['issuer_quarters'], app.state()['assets'][0]['snapshots']['issuer_quarters'])

@@ -5,13 +5,13 @@ import unittest
 from datetime import date
 from unittest.mock import patch
 
-import company_batch
-import company_research
-import contrarian
-import factor_analysis as factors
-import market_ai
-import market_brief
-import market_research as research
+from aporte_brasil.company import company_batch
+from aporte_brasil.company import company_research
+from aporte_brasil.portfolio import contrarian
+from aporte_brasil.company import factor_analysis as factors
+from aporte_brasil.ai import market_ai
+from aporte_brasil.market import market_brief
+from aporte_brasil.market import market_research as research
 import test_app as baseline
 from test_factor_analysis import monthly_series
 
@@ -116,7 +116,7 @@ class ResearchTests(unittest.TestCase):
         self.assertTrue(all(i['observation']['date']=='2026-09-30' for i in result['indicators']));self.assertEqual(len(result['errors']),10)
 
     def test_global_etf_success_and_fx_warning_are_preserved(self):
-        import international_market
+        from aporte_brasil.market import international_market
         for warnings in ([],['Câmbio indisponível; preço nativo preservado.']):
             with patch.object(international_market,'refresh_asset',return_value=warnings):
                 result=company_batch.refresh_product(app,{'asset_type':'global_etf'})

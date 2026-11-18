@@ -3,8 +3,8 @@ import copy
 from datetime import datetime, timezone
 import unittest
 from unittest.mock import patch
-import investment_exposure as x
-import market_ai as ai
+from aporte_brasil.portfolio import investment_exposure as x
+from aporte_brasil.ai import market_ai as ai
 import test_app as baseline
 import test_ai as ai_tests
 from test_us_market import chart

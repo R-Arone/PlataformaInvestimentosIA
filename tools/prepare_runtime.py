@@ -55,7 +55,7 @@ if __name__ == '__main__':
         if args.restart:
             # Stop the identified old process before updating loaded DLLs on Windows.
             sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-            import lifecycle
+            from aporte_brasil.core import lifecycle
             lifecycle.stop_existing(args.port)
         print(prepare(Path(__file__).resolve().parents[1]), flush=True)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:

@@ -2,7 +2,9 @@ import copy,unittest
 from datetime import timedelta
 from unittest.mock import patch
 import test_app as baseline
-import portfolio_strategy as strategy,sector_analysis,valuation
+from aporte_brasil.portfolio import portfolio_strategy as strategy
+from aporte_brasil.portfolio import sector_analysis
+from aporte_brasil.company import valuation
 app=baseline.app
 
 class DecisionTests(unittest.TestCase):

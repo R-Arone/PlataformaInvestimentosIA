@@ -4,8 +4,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import installer_builder
-import model_comparison
+from aporte_brasil.core import installer_builder
+from aporte_brasil.ai import model_comparison
 import test_app as baseline
 
 

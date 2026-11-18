@@ -1,7 +1,8 @@
 import copy,json,unittest
 from datetime import timedelta
 import test_app as baseline
-import csv_import,b3_import
+from aporte_brasil.importers import csv_import
+from aporte_brasil.importers import b3_import
 app=baseline.app
 
 class HoldingTests(unittest.TestCase):

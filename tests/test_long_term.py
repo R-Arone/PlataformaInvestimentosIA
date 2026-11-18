@@ -5,8 +5,8 @@ import random
 import unittest
 from datetime import date, timedelta
 from unittest.mock import patch
-import long_term
-import portfolio_strategy
+from aporte_brasil.portfolio import long_term
+from aporte_brasil.portfolio import portfolio_strategy
 import test_app as baseline
 
 app = baseline.app

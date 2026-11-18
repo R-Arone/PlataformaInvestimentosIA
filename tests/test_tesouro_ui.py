@@ -7,7 +7,7 @@ import tempfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import app
-import tesouro
+from aporte_brasil.portfolio import tesouro
 
 
 if __name__=='__main__':

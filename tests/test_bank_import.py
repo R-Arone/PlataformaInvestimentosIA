@@ -1,7 +1,7 @@
 import base64
 import unittest
 from datetime import timedelta
-import b3_import
+from aporte_brasil.importers import b3_import
 import test_app as baseline
 from test_research import workbook
 app=baseline.app

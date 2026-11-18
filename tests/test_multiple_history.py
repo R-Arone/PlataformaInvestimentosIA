@@ -5,9 +5,9 @@ import statistics
 import unittest
 from unittest.mock import patch
 
-import multiple_history as mh
-import valuation
-import valuation_history
+from aporte_brasil.company import multiple_history as mh
+from aporte_brasil.company import valuation
+from aporte_brasil.company import valuation_history
 import test_app as baseline
 
 app = baseline.app

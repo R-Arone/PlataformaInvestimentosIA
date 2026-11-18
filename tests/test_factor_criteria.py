@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import test_app as baseline
 from test_factor_analysis import fixture, monthly_series, periods
-import factor_analysis as model
-import company_history
-import company_research
-import market_ai
+from aporte_brasil.company import factor_analysis as model
+from aporte_brasil.company import company_history
+from aporte_brasil.company import company_research
+from aporte_brasil.ai import market_ai
 
 app=baseline.app
 

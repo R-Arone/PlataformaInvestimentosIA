@@ -9,7 +9,7 @@ import threading
 import unittest
 from unittest.mock import patch
 from http.server import ThreadingHTTPServer
-import private_storage as store
+from aporte_brasil.core import private_storage as store
 import test_app as baseline
 
 app=baseline.app
@@ -40,7 +40,7 @@ class StorageTests(unittest.TestCase):
         self.create()
         with self.v.connect() as c:c.execute('CREATE TABLE t(x)');c.execute('INSERT INTO t VALUES (1)')
         saved=self.v.path.read_bytes()
-        with self.assertRaises(OSError),patch('private_storage.atomic_write',side_effect=OSError('disk full')):
+        with self.assertRaises(OSError),patch('aporte_brasil.core.private_storage.atomic_write',side_effect=OSError('disk full')):
             with self.v.connect() as c:c.execute('INSERT INTO t VALUES (2)')
         self.assertEqual(self.v.path.read_bytes(),saved)
         with self.assertRaises(ValueError):
@@ -90,7 +90,7 @@ class StorageTests(unittest.TestCase):
         def fail_copy(path,data):
             if Path(path).parent.name=='backups':raise OSError('test failure')
             return original(path,data)
-        with patch('private_storage.atomic_write',side_effect=fail_copy),self.assertRaisesRegex(ValueError,'cofre foi criado'):self.v.create(PASSWORD,PASSWORD,True)
+        with patch('aporte_brasil.core.private_storage.atomic_write',side_effect=fail_copy),self.assertRaisesRegex(ValueError,'cofre foi criado'):self.v.create(PASSWORD,PASSWORD,True)
         self.assertTrue(primary.exists());self.v.unlock(PASSWORD);self.v.protect_legacy();self.assertFalse(primary.exists())
 
     def test_idle_expiration_and_changed_password_keeps_old_backup_password(self):
@@ -182,7 +182,7 @@ class ProtectedAppTests(unittest.TestCase):
     def test_b3_preview_commit_dedupe_and_encrypted_restore(self):
         baseline.AppTests.asset(self)
         d={'csv':f'Entrada/Saída;Data;Movimentação;Produto;Instituição;Quantidade;Preço unitário;Valor da Operação\nEntrada;{self.day};Compra;ABCD3;XP;10;20;200'}
-        import b3_import
+        from aporte_brasil.importers import b3_import
         p=b3_import.preview(app,d);self.assertIsNotNone(p['token']);self.assertEqual(app.state()['assets'][0]['position']['quantity'],0)
         b3_import.commit(app,{'token':p['token'],'confirm_records':True})
         payload=app.VAULT.export();self.assertNotIn(b'ABCD3',payload)

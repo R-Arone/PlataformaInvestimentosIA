@@ -2,12 +2,12 @@
 import copy
 import unittest
 from unittest.mock import patch
-import company_history
-import investment_decision
-import investment_value
-import portfolio_review as review
-import sector_analysis
-import long_term
+from aporte_brasil.company import company_history
+from aporte_brasil.portfolio import investment_decision
+from aporte_brasil.portfolio import investment_value
+from aporte_brasil.portfolio import portfolio_review as review
+from aporte_brasil.portfolio import sector_analysis
+from aporte_brasil.portfolio import long_term
 import test_app as baseline
 import test_contrarian as contra
 import test_long_term as examples

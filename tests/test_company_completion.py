@@ -8,13 +8,13 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-import company_completion as completion
-import company_quality as quality
-import company_history
-import company_research
-import public_reports
-import market_ai
-import long_term
+from aporte_brasil.company import company_completion as completion
+from aporte_brasil.company import company_quality as quality
+from aporte_brasil.company import company_history
+from aporte_brasil.company import company_research
+from aporte_brasil.company import public_reports
+from aporte_brasil.ai import market_ai
+from aporte_brasil.portfolio import long_term
 import test_app as baseline
 import test_contrarian as contra
 

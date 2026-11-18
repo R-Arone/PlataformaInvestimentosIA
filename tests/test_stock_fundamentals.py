@@ -5,7 +5,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-import stock_fundamentals as sf
+from aporte_brasil.company import stock_fundamentals as sf
 import test_app as baseline
 from test_us_market import chart
 app=baseline.app

@@ -4,10 +4,10 @@ from datetime import timedelta,datetime,timezone
 import unittest
 from unittest.mock import patch
 
-import contrarian
-import investment_exposure
-import long_term
-import portfolio_strategy
+from aporte_brasil.portfolio import contrarian
+from aporte_brasil.portfolio import investment_exposure
+from aporte_brasil.portfolio import long_term
+from aporte_brasil.portfolio import portfolio_strategy
 import test_recommendation_signals as examples
 import test_long_term as base
 import test_security as security

@@ -10,11 +10,11 @@ import test_app as baseline
 from test_stock_fundamentals import financials, profile
 from test_us_market import chart
 from test_factor_analysis import fixture as factor_fixture
-import stock_fundamentals as sf
-import company_history
-import company_research
-import company_batch
-import factor_analysis
+from aporte_brasil.company import stock_fundamentals as sf
+from aporte_brasil.company import company_history
+from aporte_brasil.company import company_research
+from aporte_brasil.company import company_batch
+from aporte_brasil.company import factor_analysis
 app=baseline.app
 
 

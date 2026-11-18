@@ -14,7 +14,7 @@ from unittest.mock import patch
 import urllib.error
 import urllib.request
 
-import lifecycle
+from aporte_brasil.core import lifecycle
 import test_app as baseline
 import test_security as protected
 from tools.check_git_safety import MODULES, allowed

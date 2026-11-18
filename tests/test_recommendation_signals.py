@@ -4,11 +4,11 @@ from datetime import timedelta
 import unittest
 from unittest.mock import patch
 
-import investment_exposure
-import long_term
-import portfolio_strategy
-import recommendation_signals as signals
-import market_signals
+from aporte_brasil.portfolio import investment_exposure
+from aporte_brasil.portfolio import long_term
+from aporte_brasil.portfolio import portfolio_strategy
+from aporte_brasil.market import recommendation_signals as signals
+from aporte_brasil.market import market_signals
 import test_long_term as base
 import test_signals
 

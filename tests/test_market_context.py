@@ -17,7 +17,7 @@ spec = importlib.util.spec_from_file_location('aporte', Path(__file__).absolute(
 app = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = app
 spec.loader.exec_module(app)
-import benchmark_prices
+from aporte_brasil.market import benchmark_prices
 
 
 def weekdays(n, end):

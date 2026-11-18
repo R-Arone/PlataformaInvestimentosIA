@@ -8,8 +8,8 @@ from datetime import date
 from unittest.mock import patch
 
 import test_app as baseline
-import factor_analysis as model
-import company_research
+from aporte_brasil.company import factor_analysis as model
+from aporte_brasil.company import company_research
 
 app=baseline.app
 

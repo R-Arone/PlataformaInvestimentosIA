@@ -5,10 +5,10 @@ import unittest
 
 import test_app as baseline
 import test_company_insights as fixtures
-import company_model as model
-import company_research as research
-import company_history as history
-import stock_fundamentals
+from aporte_brasil.company import company_model as model
+from aporte_brasil.company import company_research as research
+from aporte_brasil.company import company_history as history
+from aporte_brasil.company import stock_fundamentals
 
 app = baseline.app
 

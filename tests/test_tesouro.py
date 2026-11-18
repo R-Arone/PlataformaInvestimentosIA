@@ -4,7 +4,7 @@ from datetime import date,timedelta
 import json
 import unittest
 from unittest.mock import patch
-import tesouro
+from aporte_brasil.portfolio import tesouro
 import test_app as baseline
 import test_security as protected
 
@@ -181,7 +181,7 @@ class TreasuryTests(unittest.TestCase):
         self.assertIsNone(app.state()['fixed'][0]['tesouro']['quantity'])
 
     def test_import_product_names_cover_legacy_reserve_and_renda_brand(self):
-        import treasury_import
+        from aporte_brasil.importers import treasury_import
         for name in ('TESOURO IGP-M+ COM JUROS SEMESTRAIS 2031','TESOURO RESERVA',
                      'TESOURO RENDA+ APOSENTADORIA EXTRA 2035','TESOURO EDUCA+ 2030'):
             self.assertEqual(treasury_import.product(name),name)

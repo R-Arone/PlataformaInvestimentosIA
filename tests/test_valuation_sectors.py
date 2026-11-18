@@ -4,8 +4,8 @@ import unittest
 from datetime import date
 
 import test_app as baseline
-import valuation as v
-import factor_analysis as f
+from aporte_brasil.company import valuation as v
+from aporte_brasil.company import factor_analysis as f
 from test_factor_analysis import monthly_series, fixture
 
 app=baseline.app

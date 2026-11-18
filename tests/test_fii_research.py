@@ -6,11 +6,11 @@ import unittest
 from unittest.mock import patch
 
 import test_app as baseline
-import fii_research as fii
-import public_reports as reports
-import company_insights
-import company_history
-import sector_analysis
+from aporte_brasil.company import fii_research as fii
+from aporte_brasil.company import public_reports as reports
+from aporte_brasil.company import company_insights
+from aporte_brasil.company import company_history
+from aporte_brasil.portfolio import sector_analysis
 
 app=baseline.app
 
@@ -185,7 +185,7 @@ class FiiResearchTests(unittest.TestCase):
     def test_refresh_fetches_current_quote_and_fills_dossier_from_cvm(self):
         a=self.asset();d=fixture()
         with patch.object(reports,'fetch_fii',return_value=(d,[])),patch.object(app,'fetch_stock',return_value=('quote',{'price':90},self.day)),\
-             patch.object(app,'fetch_fii',side_effect=ValueError('Plano indisponível')),patch('extra_sources.yahoo',return_value={}),\
+             patch.object(app,'fetch_fii',side_effect=ValueError('Plano indisponível')),patch('aporte_brasil.market.extra_sources.yahoo',return_value={}),\
              patch.object(app,'request_json',return_value={'dividends':[]}):
             result=fii.refresh(app,a)
         self.assertIn('quote',result['received']);self.assertIn('fii_reports',result['received'])
@@ -195,7 +195,7 @@ class FiiResearchTests(unittest.TestCase):
     def test_empty_primary_dividends_attempt_public_fallback_with_unconfirmed_dates(self):
         a=self.saved()
         with patch.object(reports,'fetch_fii',return_value=(fixture(),[])),patch.object(app,'fetch_stock',side_effect=ValueError('Indisponível')),\
-             patch.object(app,'fetch_fii',side_effect=ValueError('Indisponível')),patch('extra_sources.yahoo',return_value={}),\
+             patch.object(app,'fetch_fii',side_effect=ValueError('Indisponível')),patch('aporte_brasil.market.extra_sources.yahoo',return_value={}),\
              patch.object(app,'request_json',return_value={'dividends':[]}),patch.object(reports,'market_dividends',return_value=({self.day:1},{},{})):
             result=fii.refresh(app,a)
         self.assertIn('fii_dividends',result['received'])
@@ -207,7 +207,7 @@ class FiiResearchTests(unittest.TestCase):
         a=self.saved();rows=[{'symbol':'TEST11','label':'RENDIMENTO','rate':1,'paymentDate':self.day},
             {'symbol':'TEST11','label':'RENDIMENTO','rate':2,'paymentDate':(app.today()+timedelta(days=5)).isoformat()}]
         with patch.object(reports,'fetch_fii',return_value=(fixture(),[])),patch.object(app,'fetch_stock',side_effect=ValueError('Indisponível')),\
-             patch.object(app,'fetch_fii',side_effect=ValueError('Indisponível')),patch('extra_sources.yahoo',return_value={}),\
+             patch.object(app,'fetch_fii',side_effect=ValueError('Indisponível')),patch('aporte_brasil.market.extra_sources.yahoo',return_value={}),\
              patch.object(app,'request_json',return_value={'dividends':rows}),patch.object(reports,'market_dividends') as fallback:
             fii.refresh(app,a)
         fallback.assert_not_called()

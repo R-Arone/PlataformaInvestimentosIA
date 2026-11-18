@@ -5,10 +5,10 @@ import json
 import unittest
 from unittest.mock import patch
 
-import us_market as us
-import market_signals as signals
-import portfolio_coupling as coupling
-import history_cache
+from aporte_brasil.market import us_market as us
+from aporte_brasil.market import market_signals as signals
+from aporte_brasil.portfolio import portfolio_coupling as coupling
+from aporte_brasil.core import history_cache
 import test_app as baseline
 from test_signals import series
 app = baseline.app
