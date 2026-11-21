@@ -15,10 +15,54 @@ const simpleMarketLabel=a=>({BR:'Brasil · B3 / Bitcoin',US:'Estados Unidos',GLO
 const simpleFold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
 const simpleViewLink=(id,label,cls='secondary')=>`<button type="button" class="button ${cls}" data-view="${id}">${esc(label)}</button>`;
 
+const phoneLayout=matchMedia('(max-width: 760px)');
+const phoneRoutes=['overview','portfolio','long-term'];
+const phoneIcons={
+ overview:'<path d="m3 10 9-7 9 7v10H3zM9 20v-6h6v6"/>',
+ portfolio:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M8 6V4h8v2M3 12h18m-11 0v2h4v-2"/>',
+ 'long-term':'<path d="M4 19h16M6 15l5-5 4 3 5-7m-5 0h5v5"/>',
+ more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
+};
+
+function phoneNavigation(section){
+ const icon=id=>`<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${phoneIcons[id]}</svg>`;
+ const current=id=>section.id===id?' aria-current="page"':'';
+ $('#phone-navigation').innerHTML=simpleSections.filter(s=>phoneRoutes.includes(s.id)).map(s=>
+  `<button type="button" data-view="${s.id}"${current(s.id)}>${icon(s.id)}${esc(s.label)}</button>`
+ ).join('')+`<button type="button" id="phone-more" aria-haspopup="dialog" aria-controls="phone-menu" ${phoneRoutes.includes(section.id)?'':'class="selected"'}>${icon('more')}Mais</button>`;
+ $('#phone-menu-links').innerHTML=simpleSections.filter(s=>!phoneRoutes.includes(s.id)).map(s=>
+  `<button type="button" data-view="${s.id}"${current(s.id)}>${esc(s.label)}<span aria-hidden="true">›</span></button>`
+ ).join('');
+}
+
+function phoneTableCards(root){
+ for(const table of $$('.table-wrap > table',root)){
+  const headers=table.tHead?.rows;
+  if(headers?.length!==1)continue;
+  const columns=Array.from(headers[0].cells);
+  const rows=Array.from(table.tBodies).flatMap(body=>Array.from(body.rows));
+  if(!rows.length||columns.some(cell=>cell.colSpan!==1)||rows.some(row=>
+   row.cells.length!==columns.length||Array.from(row.cells).some(cell=>cell.colSpan!==1||cell.rowSpan!==1)))continue;
+  table.classList.add('phone-card-table');
+  table.setAttribute('role','table');
+  for(const group of [table.tHead,...table.tBodies])group.setAttribute('role','rowgroup');
+  headers[0].setAttribute('role','row');
+  for(const column of columns)column.setAttribute('role','columnheader');
+  for(const row of rows){
+   row.setAttribute('role','row');
+   Array.from(row.cells).forEach((cell,i)=>{
+    cell.setAttribute('role',cell.tagName==='TH'?'rowheader':'cell');
+    cell.dataset.phoneLabel=columns[i].textContent.trim();
+   });
+  }
+ }
+}
+
 function simpleNavigation(){
  const section=simpleSections.find(s=>s.routes.includes(view))||simpleSections[0],nav=$('#sidebar nav');
  nav.innerHTML=simpleSections.map(s=>`<button type="button" data-view="${s.id}" class="${s===section?'active':''}" ${s===section?'aria-current="page"':''}><span aria-hidden="true">${s.icon}</span>${s.label}</button>`).join('');
  navItems.splice(0,navItems.length,...simpleSections.map(s=>[s.id,s.icon,s.label]));
+ phoneNavigation(section);
  $('#task-navigation')?.remove();
  if(!section.tabs&&!section.tools)return;
  const links=items=>items.map(([id,label])=>`<button type="button" data-view="${id}" class="${id===view?'selected':''}" ${id===view?'aria-current="page"':''}>${esc(label)}</button>`).join('');
@@ -128,10 +172,19 @@ function simpleContribution(root){
 function simpleAIMode(form){const tools=$('.simple-ai-tools',form),advanced=$('.simple-advanced',form),actions=$('button[type=submit]',form)?.closest('.actions');if(!tools||!actions)return;(form.elements.mode.value==='context'?actions:advanced).append(tools);}
 
 function simpleSessionControls(){
- const restart=$('#restart-vault'),exit=$('#exit-vault');if(!restart&&!exit)return;
+ const restart=$('#restart-vault'),exit=$('#exit-vault');
+ if(!restart&&!exit){placeSessionControls();return;}
  let menu=$('#app-session-menu');
  if(!menu){menu=document.createElement('details');menu.id='app-session-menu';menu.className='app-session-menu';menu.innerHTML='<summary>Aplicativo</summary><div class="app-session-choices"></div>';$('.header-actions').append(menu);}
  for(const b of [restart,exit])if(b)$('.app-session-choices',menu).append(b);
+ placeSessionControls();
+}
+
+function placeSessionControls(){
+ const target=phoneLayout.matches?$('#phone-menu-tools'):$('.header-actions');
+ for(const control of [$('#lock-vault'),$('#app-session-menu')]){
+  if(control&&control.parentElement!==target)target.append(control);
+ }
 }
 
 longTermResult=function(p){
@@ -173,6 +226,7 @@ render=function(){
  if(view==='global'){simpleFilters.market=view==='us'?'US':'GLOBAL';view='watchlist';history.replaceState(null,'','#watchlist');}
  simpleBaseRender();if(!S||document.body.classList.contains('vault-locked'))return;
  simpleTidy();simpleNavigation();simpleSessionControls();
+ if(view==='portfolio'||view==='income')phoneTableCards($('#main'));
 };
 
 function simpleFilterLabel(){const count=Number(!!simpleFilters.market)+Number(!!simpleFilters.sector)+Number(simpleFilters.ownership!=='all');return 'Mais filtros'+(count?' · '+count+' ativo(s)':'');}
@@ -180,6 +234,17 @@ bindForms=function(){simpleBaseBind();const mode=$('#long-term-form [name=mode]'
  const update=()=>{const next=formData(f);if(Object.keys(next).every(k=>next[k]===simpleFilters[k]))return;simpleFilters=next;$('#simple-assets-result').innerHTML=simpleAssetRows();const summary=$('details > summary',f);if(summary)summary.textContent=simpleFilterLabel();};f.addEventListener('input',update);f.addEventListener('change',update);}};
 
 document.addEventListener('invalid',e=>{const d=e.target.closest('details');if(d)d.open=true;},true);
+phoneLayout.addEventListener('change',e=>{if(!e.matches)$('#phone-menu').close();placeSessionControls();});
+document.addEventListener('click',e=>{
+ const menu=$('#phone-menu');
+ if(e.target.closest('#phone-more')){menu.showModal();return;}
+ if(e.target===menu&&e.clientY<menu.getBoundingClientRect().top){menu.close();return;}
+ if(menu.open&&e.target.closest('#phone-menu-tools button')){menu.close();return;}
+ if(!phoneLayout.matches||!e.target.closest('[data-view]'))return;
+ if(menu.open)menu.close();
+ const heading=$('#main h1');
+ if(heading&&!$('#modal').open){window.scrollTo(0,0);heading.tabIndex=-1;heading.focus({preventScroll:true});}
+});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;
  if(b.dataset.action==='simple-reset'){simpleFilters={query:'',type:'',market:'',ownership:'all',sector:''};render();}
  if(b.dataset.action==='simple-add')modal('Adicionar à minha lista',`<p>Escolha onde o investimento é negociado. Todos aparecem na mesma lista.</p><div class="task-cards"><article><h3>Brasil</h3><p>Ações, FIIs, ETFs, BDRs e Bitcoin.</p>${button('asset','Escolher ativo','')}</article><article><h3>Estados Unidos</h3><p>Stocks e ETFs negociados nos EUA.</p>${button('us-add','Cadastrar nos EUA','')}</article><article><h3>Outras bolsas</h3><p>Stocks internacionais e ETFs globais.</p>${button('global-add','Cadastrar no exterior','')}</article></div>`);

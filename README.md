@@ -1,6 +1,6 @@
 # Plataforma de Investimentos IA · Aporte Brasil
 
-Aplicação local para organizar investimentos, pesquisar empresas, comparar cenários e consultar dados públicos de mercado. Interface em português, executada no navegador com servidor Python no próprio computador.
+Aplicação local para organizar investimentos, pesquisar empresas, comparar cenários e consultar dados públicos de mercado. A interface em português roda no navegador no Windows e no aplicativo de teste para Android.
 
 ## Recursos
 
@@ -26,6 +26,58 @@ python -m venv .venv
 Abra **http://127.0.0.1:8765**. Na primeira execução, crie uma senha local de pelo menos 12 caracteres. A carteira começa vazia; cadastre seus próprios ativos ou importe seus arquivos pela interface.
 
 Consultas de mercado precisam de internet; algumas fontes exigem uma chave própria, configurada nas preferências locais.
+
+## Android
+
+O aplicativo roda localmente no Android 7.0 ou superior, em aparelhos ARM64 e emuladores x86-64. A carteira do celular fica no armazenamento privado do aplicativo. A sincronização com o PC e a transferência de dados entre o APK de teste e o futuro APK de distribuição ainda estão pendentes. Use dados fictícios durante os testes.
+
+### Instalar ou atualizar o APK de teste
+
+1. Gere o APK pelo procedimento abaixo ou receba o arquivo `.apk` de quem compilou o projeto.
+2. Copie o arquivo para o celular por USB e abra pelo gerenciador de arquivos. Se o Android solicitar, autorize a instalação para esse gerenciador. Depois da instalação, você pode revogar a permissão.
+3. Abra **Aporte Brasil (teste)**. Para instalar uma versão nova, abra o novo APK e escolha **Atualizar**. Mantenha o aplicativo anterior instalado para conservar a carteira local.
+
+Para testar pelo cabo USB, ative a depuração USB no aparelho e autorize o computador. Com o `adb` do Android SDK Platform-Tools disponível no terminal, rode na raiz do repositório:
+
+```powershell
+adb devices
+adb install -r .\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Use `adb install -r -t` se o pacote foi criado com **Run** no Android Studio e estiver marcado como `testOnly`. Para abrir o arquivo diretamente no celular, prefira o APK gerado por **Generate APK(s)** ou pelo `assembleDebug` no terminal. Se uma atualização falhar por assinatura incompatível, gere o APK com a mesma chave instalada no aparelho. Desinstalar apaga os dados locais do aplicativo.
+
+### Gerar um APK novo
+
+1. Instale o [Android Studio](https://developer.android.com/studio). No **SDK Manager**, instale **Android API 37.0**, **Build-Tools 36.0.0** e **Android SDK Platform-Tools**. Use o JDK do Android Studio para o Gradle.
+2. Instale [Python 3.12 para Windows](https://www.python.org/downloads/release/python-31210/). Para descobrir o caminho do executável, rode `py -3.12 -c "import sys; print(sys.executable)"` no PowerShell.
+3. Abra a pasta `android` do repositório no Android Studio. Se o Gradle não localizar o Python 3.12, acrescente a linha a seguir em `android/local.properties`, preservando `sdk.dir` e usando o caminho real do executável com barras `/`.
+
+   ```properties
+   aporte.buildPython=C:/caminho/para/python.exe
+   ```
+
+4. Sincronize o Gradle. Para gerar o arquivo, escolha **Build → Generate Bundle(s) / APK(s) → Generate APK(s)** com a variante `debug`. Para rodar direto, selecione o celular USB ou o emulador e clique em **Run**. A primeira compilação precisa de internet para o Gradle e as dependências do Python.
+
+No PowerShell, a partir da raiz do repositório, também é possível usar o Gradle Wrapper. O preparo baixa e verifica o JAR oficial do Gradle, que fica fora do Git.
+
+```powershell
+$env:JAVA_HOME = "$env:ProgramFiles\Android\Android Studio\jbr"
+Set-Location .\android
+.\prepare-wrapper.ps1
+.\gradlew.bat :app:assembleDebug
+```
+
+Ajuste `JAVA_HOME` se o Android Studio estiver instalado em outra pasta.
+
+O APK de teste fica em `android/app/build/outputs/apk/debug/app-debug.apk`. O Gradle inclui o `app.py`, o pacote `aporte_brasil/` e os arquivos da interface em `static/` a cada compilação. Depois de atualizar o código, gere um novo APK para incorporá-lo ao Android.
+
+### Assinatura e atualizações de distribuição
+
+- **Durante o desenvolvimento**, use a variante `debug` (`br.aporte.app.spike`) no mesmo PC. Assim, o Gradle pode reutilizar a chave de depuração. O APK de teste deste projeto mantém o identificador usado pelo protótipo anterior.
+- **Para instalar e atualizar no uso pessoal**, gere um APK `release` (`br.aporte.app`) em **Build → Generate Signed App Bundle or APK → APK**. Crie a chave de assinatura uma vez, guarde o arquivo e uma cópia segura fora do repositório e use a mesma chave em todas as atualizações. Aumente `versionCode` em `android/app/build.gradle.kts` a cada release e ajuste `versionName` para a versão visível.
+- **Para distribuir**, publique o APK assinado como anexo de uma GitHub Release e inclua o SHA-256, gerado com `Get-FileHash -Algorithm SHA256 CAMINHO_DO_APK`. Cada pessoa baixa e abre o novo APK para atualizar. Para atualizações automáticas, uma publicação futura na Google Play usaria um Android App Bundle (`.aab`) e os requisitos de publicação da loja.
+
+O Android preserva os dados em atualizações feitas sobre o mesmo identificador de aplicativo, com assinatura compatível. As variantes `debug` e `release` instalam lado a lado e têm carteiras independentes. Referências oficiais: [gerar e assinar builds](https://developer.android.com/studio/publish/app-signing), [regras de atualização](https://developer.android.com/google/play/app-updates) e [instalação com adb](https://developer.android.com/tools/adb).
 
 ## Os 11 critérios adicionais da análise da empresa
 
@@ -122,6 +174,8 @@ Não adicione dados reais ao código, aos testes, aos commits ou às issues. A r
 - `importers/`: importação de B3, CSV, Tesouro, notas de corretagem, pesquisa colada e conector Pluggy.
 
 Novos módulos entram em `aporte_brasil/<área>/` e na lista `MODULES` de `tools/check_git_safety.py`, que é a lista de arquivos permitidos no Git. Os módulos se importam por `from aporte_brasil.<área> import <módulo>`.
+
+O projeto `android/` inicia esse mesmo servidor Python dentro do aplicativo e abre a interface em uma WebView local. O código do Android entra na lista explícita `ANDROID_FILES`. Chaves, APKs, o Wrapper binário e configurações locais são excluídos.
 
 ## Testes
 

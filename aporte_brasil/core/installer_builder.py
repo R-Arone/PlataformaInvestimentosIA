@@ -24,7 +24,7 @@ from tools.check_git_safety import MODULES
 STATIC = ('index.html', 'app.js', 'expanded.js', 'research.js', 'insights.js',
           'developments.js', 'planning.js', 'decisions.js', 'context.js', 'ai.js', 'exposures.js', 'quality.js', 'international.js',
           'positions.js', 'signals.js', 'models.js', 'model-comparison-data.json', 'us.js', 'security.js', 'installer.js',
-          'stocks.js', 'buy-hold.js', 'fii-research.js', 'company-model.js', 'factor-analysis.js', 'intelligence.js', 'tesouro.js', 'style.css', 'favicon.svg')
+          'stocks.js', 'buy-hold.js', 'fii-research.js', 'company-model.js', 'factor-analysis.js', 'intelligence.js', 'tesouro.js', 'style.css', 'mobile.css', 'favicon.svg')
 PACKAGING = ('Instalar.cmd', 'Install.ps1', 'Uninstall.ps1', 'LEIA-ME.txt')
 EXCLUDED = ('torch', 'transformers', 'chronos', 'numpy', 'scipy', 'pandas',
             'matplotlib', 'PIL', 'IPython', 'pytest', 'tkinter')

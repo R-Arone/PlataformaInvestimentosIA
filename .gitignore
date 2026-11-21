@@ -81,3 +81,13 @@ env/
 
 # Script impedido pelo Windows de ser revisado; nao publicar sem revisao.
 packaging/Install.ps1
+
+# Configuração local, saídas e chaves do Android
+/android/.gradle/
+/android/.kotlin/
+/android/local.properties
+/android/gradle/wrapper/gradle-wrapper.jar
+*.apk
+*.aab
+*.jks
+*.keystore

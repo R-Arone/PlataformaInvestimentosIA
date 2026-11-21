@@ -1916,6 +1916,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/security.js': ('security.js', 'application/javascript'),
                  '/installer.js': ('installer.js', 'application/javascript'),
                  '/style.css': ('style.css', 'text/css'), '/themes.css': ('themes.css', 'text/css'),
+                 '/mobile.css': ('mobile.css', 'text/css'),
                  '/themes.js': ('themes.js', 'application/javascript'), '/favicon.svg': ('favicon.svg', 'image/svg+xml')}
         if path in files:
             fn, typ = files[path]

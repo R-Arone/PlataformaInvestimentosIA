@@ -88,6 +88,20 @@ MODULES={
 
 ROOT_FILES.add('LONGO_PRAZO.md')
 
+ANDROID_FILES={
+    'android/settings.gradle.kts',
+    'android/build.gradle.kts',
+    'android/gradle.properties',
+    'android/gradlew.bat',
+    'android/prepare-wrapper.ps1',
+    'android/gradle/wrapper/gradle-wrapper.properties',
+    'android/app/build.gradle.kts',
+    'android/app/src/main/AndroidManifest.xml',
+    'android/app/src/main/java/br/aporte/app/MainActivity.kt',
+    'android/app/src/main/python/android_entry.py',
+    'android/app/src/main/res/xml/network_security_config.xml',
+}
+
 # Layout anterior (modulos soltos na raiz): so e aceito ao auditar o historico ja publicado.
 LEGACY_ROOT_MODULES={n.rsplit('/',1)[1] for n in MODULES if n.count('/')==2 and not n.endswith('__init__.py')}
 
@@ -97,7 +111,7 @@ LOCAL_TESTS={'test_installer.py','test_model_comparison.py','test_company_histor
 
 def allowed(name,history=False):
     path=PurePosixPath(name)
-    if name in ROOT_FILES|MODULES or history and name in LEGACY_ROOT_MODULES:return True
+    if name in ROOT_FILES|MODULES|ANDROID_FILES or history and name in LEGACY_ROOT_MODULES:return True
     if '..' in path.parts or len(path.parts)!=2:return False
     parent,base=path.parts
     return (parent=='static' and path.suffix in ('.html','.css','.js','.svg')

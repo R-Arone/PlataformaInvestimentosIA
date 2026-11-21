@@ -28,6 +28,14 @@ class GitSafetyTests(unittest.TestCase):
         self.assertTrue(safety.allowed('market.py',history=True))
         self.assertFalse(safety.allowed('private/anything.py',history=True))
         self.assertFalse(safety.allowed('carteira.sqlite3',history=True))
+
+    def test_android_allowlist_excludes_keys_and_build_outputs(self):
+        self.assertTrue(safety.allowed('android/app/src/main/python/android_entry.py'))
+        self.assertTrue(safety.allowed('android/app/src/main/java/br/aporte/app/MainActivity.kt'))
+        for name in ('android/local.properties','android/release.jks','android/gradle/wrapper/gradle-wrapper.jar',
+                     'android/app/build/outputs/apk/debug/app-debug.apk','android/app/src/main/python/private.py'):
+            self.assertFalse(safety.allowed(name),name)
+            self.assertFalse(safety.allowed(name,history=True),name)
     def test_staged_private_file_refused_even_forced_into_index(self):
         (self.root/'data').mkdir();(self.root/'data/carteira.sqlite3').write_bytes(b'SQLite format 3\x00TEST')
         self.git('add','data/carteira.sqlite3');self.assertEqual(self.check().returncode,1)
