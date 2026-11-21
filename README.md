@@ -58,16 +58,20 @@ Use `adb install -r -t` se o pacote foi criado com **Run** no Android Studio e e
 
 4. Sincronize o Gradle. Para gerar o arquivo, escolha **Build → Generate Bundle(s) / APK(s) → Generate APK(s)** com a variante `debug`. Para rodar direto, selecione o celular USB ou o emulador e clique em **Run**. A primeira compilação precisa de internet para o Gradle e as dependências do Python.
 
-No PowerShell, a partir da raiz do repositório, também é possível usar o Gradle Wrapper. O preparo baixa e verifica o JAR oficial do Gradle, que fica fora do Git.
+#### Compilar pelo terminal, sem Android Studio
+
+Instale um JDK compatível com o Gradle 9.3.1 (o build foi testado com Java 25), o Python 3.12 e as [ferramentas de linha de comando do SDK](https://developer.android.com/tools/sdkmanager). Use `sdkmanager` para instalar o SDK da API 37, Build-Tools 36.0.0 e Platform-Tools. Em `android/local.properties`, configure `sdk.dir=C:/caminho/para/Android/Sdk` e, se necessário, `aporte.buildPython` conforme o exemplo acima.
+
+No PowerShell, a partir da raiz do repositório, aponte `JAVA_HOME` para o JDK instalado. O preparo baixa e verifica o JAR oficial do Gradle, que fica fora do Git.
 
 ```powershell
-$env:JAVA_HOME = "$env:ProgramFiles\Android\Android Studio\jbr"
+$env:JAVA_HOME = "C:\caminho\para\o\jdk"
 Set-Location .\android
 .\prepare-wrapper.ps1
 .\gradlew.bat :app:assembleDebug
 ```
 
-Ajuste `JAVA_HOME` se o Android Studio estiver instalado em outra pasta.
+Se você já instalou o Android Studio, pode usar a pasta `jbr` dele como `JAVA_HOME`.
 
 O APK de teste fica em `android/app/build/outputs/apk/debug/app-debug.apk`. O Gradle inclui o `app.py`, o pacote `aporte_brasil/` e os arquivos da interface em `static/` a cada compilação. Depois de atualizar o código, gere um novo APK para incorporá-lo ao Android.
 
@@ -75,9 +79,24 @@ O APK de teste fica em `android/app/build/outputs/apk/debug/app-debug.apk`. O Gr
 
 - **Durante o desenvolvimento**, use a variante `debug` (`br.aporte.app.spike`) no mesmo PC. Assim, o Gradle pode reutilizar a chave de depuração. O APK de teste deste projeto mantém o identificador usado pelo protótipo anterior.
 - **Para instalar e atualizar no uso pessoal**, gere um APK `release` (`br.aporte.app`) em **Build → Generate Signed App Bundle or APK → APK**. Crie a chave de assinatura uma vez, guarde o arquivo e uma cópia segura fora do repositório e use a mesma chave em todas as atualizações. Aumente `versionCode` em `android/app/build.gradle.kts` a cada release e ajuste `versionName` para a versão visível.
-- **Para distribuir**, publique o APK assinado como anexo de uma GitHub Release e inclua o SHA-256, gerado com `Get-FileHash -Algorithm SHA256 CAMINHO_DO_APK`. Cada pessoa baixa e abre o novo APK para atualizar. Para atualizações automáticas, uma publicação futura na Google Play usaria um Android App Bundle (`.aab`) e os requisitos de publicação da loja.
+- **Para publicar na Google Play**, gere um `release` no formato **Android App Bundle** (`.aab`) e configure o **Play App Signing**. Guarde a chave de upload fora do Git. Se quiser distribuir o mesmo app também por APK direto, planeje a assinatura antes do primeiro lançamento para manter as atualizações compatíveis entre os dois canais. [Guia de assinatura do Android](https://developer.android.com/studio/publish/app-signing?hl=pt-br).
 
 O Android preserva os dados em atualizações feitas sobre o mesmo identificador de aplicativo, com assinatura compatível. As variantes `debug` e `release` instalam lado a lado e têm carteiras independentes. Referências oficiais: [gerar e assinar builds](https://developer.android.com/studio/publish/app-signing), [regras de atualização](https://developer.android.com/google/play/app-updates) e [instalação com adb](https://developer.android.com/tools/adb).
+
+### Compartilhar com amigos
+
+| Caminho | Quem recebe | Custo e atualização |
+| --- | --- | --- |
+| **Teste interno da Google Play** | Até 100 testadores por app. Adicione os e-mails na Play Console, publique o `.aab` em **Teste interno** e compartilhe o link de adesão. | Taxa única de **US$ 25** para abrir a conta de desenvolvedor. A instalação é gratuita para os testadores e a Play Store pode atualizar o app conforme as preferências de cada aparelho. [Cadastro](https://support.google.com/googleplay/android-developer/answer/6112435?hl=pt-BR) · [Teste interno](https://support.google.com/googleplay/android-developer/answer/9845334?hl=pt-BR) · [Atualizações automáticas](https://support.google.com/googleplay/answer/113412?hl=pt-BR) |
+| **Distribuição limitada fora da Play Store** | Até 20 dispositivos autorizados por convite no **Android Developer Console**. Envie aos convidados o APK `release` assinado. | Conta gratuita. Cada pessoa instala manualmente o novo APK para atualizar. [Distribuição limitada do Android](https://support.google.com/android-developer-console/answer/16640817) |
+
+Para um grupo pequeno que quer atualizações pela loja, comece com upload manual no **Teste interno**. A lista de convidados restringe o acesso pela loja. Mantenha as chaves de assinatura fora do Git e teste com dados fictícios até validar backup e restauração no Android.
+
+### Automatizar a compilação com GitHub Actions
+
+O repositório pode continuar privado. Um fluxo futuro pode compilar uma versão quando você criar uma tag, como `v0.1.0`. No GitHub Free, a franquia inclui **2.000 minutos mensais** em executores padrão e **500 MB** de armazenamento de artefatos. Sem um meio de pagamento válido cadastrado, o uso é bloqueado ao consumir a franquia. [Preços e franquias do GitHub Actions](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
+
+Se usar GitHub Releases, anexe o APK assinado à release e inclua o SHA-256 gerado com `Get-FileHash -Algorithm SHA256 CAMINHO_DO_APK`. Em um repositório privado, a release segue as permissões de leitura do repositório. Para entregar o APK a amigos sem dar acesso ao código, use um dos canais acima. [Acesso às releases no GitHub](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases).
 
 ## Os 11 critérios adicionais da análise da empresa
 

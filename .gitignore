@@ -86,6 +86,7 @@ packaging/Install.ps1
 /android/.gradle/
 /android/.kotlin/
 /android/local.properties
+/android/gradle/gradle-daemon-jvm.properties
 /android/gradle/wrapper/gradle-wrapper.jar
 *.apk
 *.aab
