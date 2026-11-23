@@ -4,6 +4,9 @@ const KEY='aporte-theme';
 const THEMES=[
  {id:'auto',name:'Automático',icon:'🖥️',group:'Sistema'},
  {id:'claro',name:'Claro',icon:'☀️',group:'Claros'},
+ {id:'jade',name:'Jade',icon:'🌿',group:'Essenciais'},
+ {id:'areia',name:'Areia',icon:'☀️',group:'Essenciais'},
+ {id:'meia-noite',name:'Meia-noite',icon:'🌙',group:'Essenciais'},
  {id:'solarized-claro',name:'Solarized Claro',icon:'🌅',group:'Claros'},
  {id:'sepia',name:'Papel (sépia)',icon:'📜',group:'Claros'},
  {id:'noturno',name:'Noturno',icon:'🌙',group:'Escuros'},
@@ -95,12 +98,16 @@ const THEMES=[
  {id:'alto-contraste',name:'Alto contraste',icon:'👁️',group:'Acessibilidade'}
 ];
 const LIGHT=new Set(['claro','solarized-claro','sepia','fofo','retro95','neobrutalista','gameboy','jornal','planilha','maca','windows-xp','vaporwave','hq-pop','pergaminho','por-do-sol','japao','wii','windows-7','orkut','brasil','verao','outlook','fintech','mensageiro','ludico','plataforma','blocos','postit','caderno','festa-junina','notion','faroeste','memphis','egito','geocities','msn','jukebox','maquina-escrever','azulejo','jornal-antigo','preto-branco','formulario','rose-gold']);
+LIGHT.add('jade').add('areia');
 const known=id=>THEMES.some(t=>t.id===id);
 const root=document.documentElement;
 const dark=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;
-let choice='claro';
-try{const saved=localStorage.getItem(KEY);if(saved&&known(saved))choice=saved;}catch(_){}
-const resolve=id=>id==='auto'?(dark&&dark.matches?'noturno':'claro'):id;
+const phone=matchMedia('(max-width: 760px), (max-width: 1000px) and (max-height: 520px) and (pointer: coarse)');
+const essentials=['auto','jade','meia-noite','areia','alto-contraste'];
+const defaultChoice=()=>phone.matches?'auto':'claro';
+let savedChoice=null,choice=defaultChoice();
+try{const saved=localStorage.getItem(KEY);if(saved&&known(saved))savedChoice=choice=saved;}catch(_){}
+const resolve=id=>id==='auto'?(dark?.matches?(phone.matches?'meia-noite':'noturno'):(phone.matches?'jade':'claro')):id;
 const info=id=>THEMES.find(t=>t.id===id)||THEMES[1];
 function cssVar(name,fallback){const v=getComputedStyle(root).getPropertyValue(name).trim();return v||fallback;}
 function iconSvg(){
@@ -121,37 +128,38 @@ function apply(id,{save=true,announce=false,animate=false}={}){
  if(!known(id))id='claro';
  choice=id;
  const real=resolve(id);
- if(animate){root.classList.add('theme-fade');setTimeout(()=>root.classList.remove('theme-fade'),400);}
+ if(animate&&!phone.matches){root.classList.add('theme-fade');setTimeout(()=>root.classList.remove('theme-fade'),400);}
  root.dataset.theme=real;
  root.dataset.tone=LIGHT.has(real)?'light':'dark';
- if(save){try{localStorage.setItem(KEY,id);}catch(_){}}
+ if(save){savedChoice=id;try{localStorage.setItem(KEY,id);}catch(_){}}
  paintIcons();
  refreshUi(announce);
 }
 /* ---------- interface ---------- */
-let wrap,btn,menu,live;
+let wrap,btn,menu,live,catalog;
 const paletteSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>';
 function preview(id){return id==='auto'?'<span class="theme-pv theme-pv-auto" aria-hidden="true"><i></i><b><u></u><s></s></b></span>':`<span class="theme-pv" data-pv="${id}" aria-hidden="true"><i></i><b><u></u><s></s></b></span>`;}
+function options(group,themes){
+ const buttons=themes.map(t=>`<button type="button" class="theme-opt" role="radio" aria-checked="false" data-theme-id="${t.id}">${preview(t.id)}<span class="nm"><span class="ic" aria-hidden="true">${t.icon}</span>${t.name}<span class="ck" aria-hidden="true">✓</span></span></button>`).join('');
+ return `<div class="theme-grid" role="radiogroup" aria-label="${group}">${buttons}</div>`;
+}
 function build(){
  wrap=document.createElement('div');wrap.className='theme-switch';wrap.id='theme-switch';
  btn=document.createElement('button');btn.type='button';btn.id='theme-btn';btn.className='button secondary theme-btn';
- btn.setAttribute('aria-haspopup','true');btn.setAttribute('aria-expanded','false');btn.setAttribute('aria-controls','theme-menu');
+ btn.setAttribute('aria-haspopup','dialog');btn.setAttribute('aria-expanded','false');btn.setAttribute('aria-controls','theme-menu');
  btn.innerHTML=paletteSvg+'<span class="theme-label">Tema</span><span class="theme-current" aria-hidden="true"></span>';
  menu=document.createElement('div');menu.id='theme-menu';menu.className='theme-menu';menu.hidden=true;menu.setAttribute('role','dialog');menu.setAttribute('aria-label','Escolher aparência');
- let html='<p class="theme-intro">Muda só o visual. Seus dados e a ordem das telas continuam iguais.</p>';
- for(const group of [...new Set(THEMES.map(t=>t.group))]){
-  html+=`<h2>${group}</h2><div class="theme-grid" role="radiogroup" aria-label="${group}">`;
-  for(const t of THEMES.filter(x=>x.group===group))html+=`<button type="button" class="theme-opt" role="radio" aria-checked="false" data-theme-id="${t.id}">${preview(t.id)}<span class="nm"><span class="ic" aria-hidden="true">${t.icon}</span>${t.name}<span class="ck" aria-hidden="true">✓</span></span></button>`;
-  html+='</div>';
- }
- menu.innerHTML=html;
+ const remaining=THEMES.filter(t=>!essentials.includes(t.id));
+ const groups=[...new Set(remaining.map(t=>t.group))];
+ menu.innerHTML=`<header class="theme-menu-heading"><h2>Aparência</h2><span class="theme-choice-name"></span></header>${options('Temas essenciais',essentials.map(info))}<details class="theme-catalog" ${phone.matches?'':'open'}><summary>Todos os temas</summary>${groups.map(group=>`<h2>${group}</h2>${options(group,remaining.filter(t=>t.group===group))}`).join('')}</details>`;
+ catalog=menu.querySelector('.theme-catalog');
  live=document.createElement('div');live.className='sr-only';live.setAttribute('role','status');live.setAttribute('aria-live','polite');
  wrap.append(btn,menu,live);
  btn.addEventListener('click',()=>menu.hidden?open():close(true));
  menu.addEventListener('click',e=>{const o=e.target.closest('.theme-opt');if(o)apply(o.dataset.themeId,{announce:true,animate:true});});
  menu.addEventListener('keydown',e=>{
   if(!['ArrowRight','ArrowLeft','ArrowDown','ArrowUp'].includes(e.key))return;
-  const opts=[...menu.querySelectorAll('.theme-opt')],i=opts.indexOf(document.activeElement);if(i<0)return;
+  const opts=[...menu.querySelectorAll('.theme-opt')].filter(o=>o.getClientRects().length),i=opts.indexOf(document.activeElement);if(i<0)return;
   e.preventDefault();const step=e.key==='ArrowRight'||e.key==='ArrowDown'?1:-1;opts[(i+step+opts.length)%opts.length].focus();
  });
 }
@@ -163,12 +171,18 @@ function mount(){
  refreshUi(false);
  new MutationObserver(()=>{if(!document.getElementById('theme-switch'))bar.appendChild(wrap);}).observe(bar,{childList:true});
 }
-function open(){menu.hidden=false;btn.setAttribute('aria-expanded','true');(menu.querySelector('.theme-opt[aria-checked="true"]')||menu.querySelector('.theme-opt')).focus();}
-function close(focusBtn){if(!menu||menu.hidden)return;menu.hidden=true;btn.setAttribute('aria-expanded','false');if(focusBtn)btn.focus();}
+function open(){
+ menu.hidden=false;btn.setAttribute('aria-expanded','true');
+ const current=menu.querySelector('.theme-opt[aria-checked="true"]');
+ (current?.getClientRects().length?current:menu.querySelector('.theme-opt')).focus({preventScroll:phone.matches});
+ if(phone.matches)menu.scrollTop=0;
+}
+function close(focusBtn){if(!menu||menu.hidden)return false;menu.hidden=true;btn.setAttribute('aria-expanded','false');if(focusBtn)btn.focus();return true;}
 function refreshUi(announce){
  if(!menu)return;
  for(const o of menu.querySelectorAll('.theme-opt'))o.setAttribute('aria-checked',String(o.dataset.themeId===choice));
  const t=info(choice);
+ menu.querySelector('.theme-choice-name').textContent=t.name;
  btn.querySelector('.theme-current').textContent=t.icon;
  btn.title='Aparência: '+t.name;
  btn.setAttribute('aria-label','Aparência: '+t.name+'. Alterar tema');
@@ -177,9 +191,10 @@ function refreshUi(announce){
 document.addEventListener('click',e=>{if(menu&&!menu.hidden&&!e.target.closest('#theme-switch'))close(false);});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menu&&!menu.hidden){e.stopPropagation();close(true);}},true);
 if(dark)(dark.addEventListener?dark.addEventListener.bind(dark,'change'):dark.addListener.bind(dark))(()=>{if(choice==='auto')apply('auto',{save:false});});
-window.addEventListener('storage',e=>{if(e.key===KEY&&e.newValue&&known(e.newValue))apply(e.newValue,{save:false});});
+phone.addEventListener('change',()=>{if(catalog)catalog.open=!phone.matches;apply(savedChoice||defaultChoice(),{save:false});});
+window.addEventListener('storage',e=>{if(e.key===KEY){savedChoice=known(e.newValue)?e.newValue:null;apply(savedChoice||defaultChoice(),{save:false});}});
 apply(choice,{save:false});
 const ready=()=>{mount();paintIcons();let q;new MutationObserver(()=>{cancelAnimationFrame(q);q=requestAnimationFrame(paintIcons);}).observe(document.body,{childList:true,subtree:true});};
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',ready):ready();
-window.AporteTheme={apply:id=>apply(id,{animate:true}),current:()=>choice,list:()=>THEMES.map(t=>t.id)};
+window.AporteTheme={apply:id=>apply(id,{animate:true}),current:()=>choice,list:()=>THEMES.map(t=>t.id),close:()=>close(true)};
 })();

@@ -80,7 +80,9 @@ def run(app,d):
         try:
             market_ai.progress('Pesquisando panorama geral na internet, sem dados da carteira…')
             web,errors=market_ai.research(app,QUESTION);report['warnings'].extend(errors)
-        except Exception:report['warnings'].append('Pesquisa ampliada indisponível; usando notícias públicas e indicadores disponíveis. Confira a chave de busca nas configurações de IA.')
+        except Exception as exc:
+            detail=f' {exc}' if isinstance(exc,ValueError) else ''
+            report['warnings'].append(f'Pesquisa ampliada indisponível.{detail} Usando notícias públicas e indicadores disponíveis.')
     with ThreadPoolExecutor(max_workers=3) as pool:
         tasks={p:pool.submit(market_brief.fetch,p,datetime.now(timezone.utc)) for p in selected}
         for n,(p,task) in enumerate(tasks.items(),1):

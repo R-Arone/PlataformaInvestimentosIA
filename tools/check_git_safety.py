@@ -1,5 +1,6 @@
 """Fail closed when private artifacts enter the Git index or reachable history."""
 import argparse
+from hashlib import sha256
 from pathlib import PurePosixPath
 import re
 import subprocess
@@ -99,7 +100,16 @@ ANDROID_FILES={
     'android/app/src/main/AndroidManifest.xml',
     'android/app/src/main/java/br/aporte/app/MainActivity.kt',
     'android/app/src/main/python/android_entry.py',
+    'android/app/src/main/res/values/styles.xml',
+    'android/app/src/main/res/values-night/styles.xml',
     'android/app/src/main/res/xml/network_security_config.xml',
+}
+
+# The shortcut icons are binary. Match their reviewed bytes at the exact paths.
+# Keep previous digests when replacing an icon so existing history still passes.
+SHORTCUT_ICONS={
+    'packaging/abrir-aporte.ico': {'e89ff946df0115cacd642f2544b780b132e4dd1ed251f7e9acb8ec1e51686f48'},
+    'packaging/reiniciar-aporte.ico': {'836861556b930290efaacba8599457a26b4067f04c03f0b373fcb86fdbaaf7b8'},
 }
 
 # Layout anterior (modulos soltos na raiz): so e aceito ao auditar o historico ja publicado.
@@ -111,12 +121,12 @@ LOCAL_TESTS={'test_installer.py','test_model_comparison.py','test_company_histor
 
 def allowed(name,history=False):
     path=PurePosixPath(name)
-    if name in ROOT_FILES|MODULES|ANDROID_FILES or history and name in LEGACY_ROOT_MODULES:return True
+    if name in ROOT_FILES|MODULES|ANDROID_FILES or name in SHORTCUT_ICONS or history and name in LEGACY_ROOT_MODULES:return True
     if '..' in path.parts or len(path.parts)!=2:return False
     parent,base=path.parts
     return (parent=='static' and path.suffix in ('.html','.css','.js','.svg')
         or parent=='tests' and base.startswith('test_') and not base.endswith('_live.py') and base not in LOCAL_TESTS and path.suffix=='.py'
-        or parent=='tools' and base in ('check_git_safety.py','export_source.py','build_windows.ps1','runtime_probe.py','prepare_runtime.py','build_installer.py')
+        or parent=='tools' and base in ('check_git_safety.py','export_source.py','build_windows.ps1','runtime_probe.py','prepare_runtime.py','build_installer.py','create_desktop_shortcuts.ps1')
         or parent=='packaging' and base in ('Instalar.cmd','Uninstall.ps1','LEIA-ME.txt')
         or parent=='.githooks' and base in ('pre-commit','pre-push'))
 
@@ -129,7 +139,9 @@ SENSITIVE=(
     ('email pessoal', re.compile(rb'(?i)[A-Za-z0-9_.+-]+@(?:gmail|hotmail|outlook|yahoo|icloud|protonmail)\.[A-Za-z.]+')),
 )
 
-def content_problem(data):
+def content_problem(data,name=''):
+    if name in SHORTCUT_ICONS:
+        return None if sha256(data).hexdigest() in SHORTCUT_ICONS[name] else 'icone diferente dos arquivos revisados'
     if b'SQLite format 3\x00' in data[:32] or data.startswith(b'APORTE-VAULT\x00'):
         return 'conteudo de banco de dados'
     if data.startswith((b'PK\x03\x04',b'MZ',b'\x1f\x8b',b'\x89PNG',b'\xff\xd8\xff',b'%PDF')):
@@ -167,7 +179,7 @@ def audit(history=False,staged=False,refs=()):
             entries.append((name,run('show',':'+name),None if mode in (b'100644',b'100755') else 'link/submodulo nao permitido'))
     violations=[]
     for name,data,problem in entries:
-        problem=problem or ('fora da lista de arquivos de codigo permitidos' if not allowed(name,history) else content_problem(data))
+        problem=problem or ('fora da lista de arquivos de codigo permitidos' if not allowed(name,history) else content_problem(data,name))
         if problem:violations.append(name+' ('+problem+')')
     if violations:
         print('Publicacao bloqueada: arquivos possivelmente privados:',file=sys.stderr)

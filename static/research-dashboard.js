@@ -62,9 +62,30 @@ function researchLagPane(a){const d=a.company_research?.factor_analysis?.delayed
 }
 companyDriversPane=function(a){return researchDriversBefore(a)+researchLagPane(a);};
 
+function placeAnalysisActions(){
+ const headingActions=$('.page-heading .actions'),taskNav=$('#task-navigation');
+ const actions=$$('#main [data-phone-analysis]');
+ if(!headingActions||!taskNav||!actions.length)return;
+ let tools=$('.phone-research-tools');
+ if(phoneLayout.matches){
+  const watchlistTools=$('.task-tools > div',taskNav);
+  if(!watchlistTools&&!tools){
+   tools=document.createElement('details');tools.className='phone-research-tools';
+   tools.innerHTML='<summary>Análise em lote</summary>';
+   taskNav.after(tools);
+  }
+  const target=watchlistTools||tools;
+  for(const action of actions)if(action.parentElement!==target)target.append(action);
+ }else{
+  for(const action of actions)if(action.parentElement!==headingActions)headingActions.append(action);
+  tools?.remove();
+ }
+}
+phoneLayout.addEventListener('change',placeAnalysisActions);
+
 render=function(){researchRenderBefore();if(!S||document.body.classList.contains('vault-locked'))return;
  if(['watchlist','portfolio'].includes(view)){
-  $('.page-heading .actions')?.insertAdjacentHTML('beforeend',button('research-batch-open','Analisar todos os ativos','secondary',S.ai.job.running?'disabled':''));
+  $('.page-heading .actions')?.insertAdjacentHTML('beforeend',button('research-batch-open','Analisar todos os ativos','secondary',`data-phone-analysis ${S.ai.job.running?'disabled':''}`));
   $('#task-navigation')?.insertAdjacentHTML('afterend',researchJob()+researchBatchPanel());
  }
  if(view==='news'){

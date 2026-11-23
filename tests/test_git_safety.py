@@ -42,6 +42,18 @@ class GitSafetyTests(unittest.TestCase):
     def test_renamed_database_content_refused(self):
         (self.root/'app.py').write_bytes(b'SQLite format 3\x00TEST')
         self.git('add','app.py');self.assertEqual(self.check().returncode,1)
+
+    def test_shortcut_icons_allow_only_the_reviewed_bytes_at_the_expected_path(self):
+        (self.root/'packaging').mkdir()
+        icons = ('packaging/abrir-aporte.ico', 'packaging/reiniciar-aporte.ico')
+        for name in icons:
+            (self.root/name).write_bytes((ROOT/name).read_bytes())
+        self.git('add', *icons)
+        self.assertEqual(self.check().returncode, 0)
+        (self.root/icons[0]).write_bytes((ROOT/icons[1]).read_bytes())
+        self.git('add', icons[0])
+        self.assertEqual(self.check().returncode, 1)
+
     def test_deleted_private_file_is_still_refused_in_history(self):
         (self.root/'backup.json').write_text('{}');self.git('add','backup.json');self.git('commit','-m','Synthetic history')
         self.git('rm','backup.json');self.git('commit','-m','Remove synthetic file')

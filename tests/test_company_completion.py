@@ -80,6 +80,19 @@ class CompletionTests(unittest.TestCase):
             items,_,errors,_=completion.propose(app,a,[field])
         self.assertFalse(items);self.assertTrue(errors)
 
+    def test_web_sources_are_kept_when_only_snippets_exist_or_local_inference_fails(self):
+        aid=self.asset();a=company_research.asset(app,aid);source=self.report(aid)['sources'][0]
+        field=dict(kind='fact',key='founded_year',label='Fundação',baseline=completion.digest(None))
+        for kind in ('search_excerpt','page_read'):
+            with self.subTest(kind=kind):
+                sources=[{**source,'kind':kind}]
+                with patch.object(market_ai,'research',return_value=(sources,[])),patch.object(market_ai,'generate',side_effect=ValueError('Modelo indisponível.')) as model:
+                    items,received,warnings,_=completion.propose(app,a,[field])
+                self.assertEqual(received,sources)
+                self.assertEqual(model.call_count,int(kind=='page_read'))
+                self.assertFalse(items)
+                self.assertTrue(warnings)
+
     def test_no_ai_preserves_manual_records_and_exposes_pending_fields(self):
         aid=self.asset();a=company_research.asset(app,aid);checks,fields=completion.missing(app,a)
         self.assertTrue(checks);self.assertTrue(any(f['key']=='founded_year' for f in fields))

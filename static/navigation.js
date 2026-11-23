@@ -5,7 +5,7 @@ const simpleSections=[
  {id:'overview',icon:'◫',label:'Início',routes:['overview']},
  {id:'portfolio',icon:'▤',label:'Carteira',routes:['portfolio','income'],tabs:[['portfolio','Posições'],['income','Proventos']]},
  {id:'watchlist',icon:'◎',label:'Analisar ativos',routes:['watchlist','compare','sectors','prices','us','global'],tabs:[['watchlist','Minha lista'],['us','Stocks e BDRs'],['compare','Comparar']],tools:[['sectors','Setores e critérios'],['prices','Cenários de preço']]},
- {id:'long-term',icon:'◇',label:'Aportar',routes:['long-term','goals','rates','tesouro','fx','taxes'],tabs:[['long-term','Sugerir aporte'],['goals','Metas e limites']],tools:[['rates','Renda fixa'],['tesouro','Meus Tesouros'],['fx','Custo do dólar'],['taxes','Impostos por produto']]},
+ {id:'long-term',icon:'◇',label:'Aportar',routes:['long-term','goals','retirement','rates','tesouro','fx','taxes'],tabs:[['long-term','Sugerir aporte'],['goals','Metas e limites']],tools:[['retirement','Aposentadoria'],['rates','Renda fixa'],['tesouro','Meus Tesouros'],['fx','Custo do dólar'],['taxes','Impostos por produto']]},
  {id:'news',icon:'◈',label:'Mercado',routes:['news','signals','crypto'],tools:[['signals','Modelos de IA'],['crypto','Bitcoin']]},
  {id:'settings',icon:'⚙',label:'Configurações',routes:['settings','imports','sources'],tabs:[['settings','Preferências e backup'],['imports','Importar dados'],['sources','Fontes e atualização']]}
 ];
@@ -15,24 +15,34 @@ const simpleMarketLabel=a=>({BR:'Brasil · B3 / Bitcoin',US:'Estados Unidos',GLO
 const simpleFold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
 const simpleViewLink=(id,label,cls='secondary')=>`<button type="button" class="button ${cls}" data-view="${id}">${esc(label)}</button>`;
 
-const phoneLayout=matchMedia('(max-width: 760px)');
-const phoneRoutes=['overview','portfolio','long-term'];
+const phoneLayout=matchMedia('(max-width: 760px), (max-width: 1000px) and (max-height: 520px) and (pointer: coarse)');
+const phoneRoutes=[['overview','Início'],['portfolio','Carteira'],['watchlist','Ativos'],['long-term','Aportar']];
 const phoneIcons={
  overview:'<path d="m3 10 9-7 9 7v10H3zM9 20v-6h6v6"/>',
  portfolio:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M8 6V4h8v2M3 12h18m-11 0v2h4v-2"/>',
+ watchlist:'<circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/>',
  'long-term':'<path d="M4 19h16M6 15l5-5 4 3 5-7m-5 0h5v5"/>',
+ news:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',
+ settings:'<path d="M5 7h14M5 17h14"/><circle cx="9" cy="7" r="2" fill="var(--surf2)"/><circle cx="15" cy="17" r="2" fill="var(--surf2)"/>',
  more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
 };
+const phoneIcon=id=>`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${phoneIcons[id]}</svg>`;
 
 function phoneNavigation(section){
- const icon=id=>`<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${phoneIcons[id]}</svg>`;
- const current=id=>section.id===id?' aria-current="page"':'';
- $('#phone-navigation').innerHTML=simpleSections.filter(s=>phoneRoutes.includes(s.id)).map(s=>
-  `<button type="button" data-view="${s.id}"${current(s.id)}>${icon(s.id)}${esc(s.label)}</button>`
- ).join('')+`<button type="button" id="phone-more" aria-haspopup="dialog" aria-controls="phone-menu" ${phoneRoutes.includes(section.id)?'':'class="selected"'}>${icon('more')}Mais</button>`;
- $('#phone-menu-links').innerHTML=simpleSections.filter(s=>!phoneRoutes.includes(s.id)).map(s=>
-  `<button type="button" data-view="${s.id}"${current(s.id)}>${esc(s.label)}<span aria-hidden="true">›</span></button>`
- ).join('');
+ const primary=id=>phoneRoutes.some(([route])=>route===id);
+ const nav=$('#phone-navigation'),links=$('#phone-menu-links');
+ if(!nav.children.length){
+  nav.innerHTML=phoneRoutes.map(([id,label])=>`<button type="button" data-view="${id}"><span>${phoneIcon(id)}</span>${esc(label)}</button>`).join('')+
+   `<button type="button" id="phone-more" aria-haspopup="dialog" aria-controls="phone-menu" aria-expanded="false"><span>${phoneIcon('more')}</span>Mais</button>`;
+  links.innerHTML=simpleSections.filter(s=>!primary(s.id)).map(s=>
+   `<button type="button" data-view="${s.id}">${phoneIcon(s.id)}${esc(s.label)}<span aria-hidden="true">›</span></button>`).join('');
+ }
+ for(const button of [...nav.children,...links.children]){
+  button.classList.remove('active');
+  if(button.dataset.view===section.id)button.setAttribute('aria-current','page');
+  else button.removeAttribute('aria-current');
+ }
+ $('#phone-more').classList.toggle('selected',!primary(section.id));
 }
 
 function phoneTableCards(root){
@@ -72,9 +82,14 @@ function simpleNavigation(){
 
 overview=function(){
  const t=totals(),stale=S.assets.filter(a=>!a.snapshots.quote||age(a.snapshots.quote.asof)>7).length;
+ const task=(id,title,note,label,cls='secondary')=>`<article><h3>${title}</h3><p>${note}</p><button type="button" class="button ${cls}" data-view="${id}">${phoneIcon(id)}<span>${label}</span><span class="task-arrow" aria-hidden="true">›</span></button></article>`;
  return page('Início','Seu patrimônio e os próximos passos, em um só lugar.')+refreshNotice()+
  `<div class="cards">${card('Patrimônio acompanhado',money(t.total),'Cotações disponíveis e saldos informados','feature')}${card('Posições na carteira',t.held.length+S.fixed.length,'Ativos negociados, fundos e títulos')}${card('Ativos para acompanhar',S.assets.length,stale?stale+' cotação(ões) a atualizar':'Cotações com referência recente')}</div>
- <section class="panel"><h2>O que você quer fazer agora?</h2><div class="task-cards"><article><h3>Decidir o próximo aporte</h3><p>Informe o dinheiro novo e compare qualidade, preço e contrafluxo.</p>${simpleViewLink('long-term','Sugerir meu aporte','')}</article><article><h3>Analisar um investimento</h3><p>Encontre ações, FIIs e ETFs na mesma lista e abra a análise do ativo.</p>${simpleViewLink('watchlist','Analisar minha lista')}</article><article><h3>Conferir minhas posições</h3><p>Veja saldos, operações e proventos já registrados.</p>${simpleViewLink('portfolio','Abrir carteira')}</article></div></section>
+ <section class="panel overview-shortcuts"><h2>Atalhos</h2><div class="task-cards">
+ ${task('long-term','Decidir o próximo aporte','Informe o dinheiro novo e compare qualidade, preço e contrafluxo.','Sugerir meu aporte','')}
+ ${task('watchlist','Analisar um investimento','Encontre ações, FIIs e ETFs na mesma lista e abra a análise do ativo.','Analisar minha lista')}
+ ${task('portfolio','Conferir minhas posições','Veja saldos, operações e proventos já registrados.','Abrir carteira')}
+ </div></section>
  ${t.unknown||t.stale?`<section class="notice warn">Há posições sem cotação recente ou avaliadas pelo custo. Confira as referências antes de decidir um aporte. ${simpleViewLink('sources','Conferir atualização')}</section>`:''}`;
 };
 
@@ -92,7 +107,16 @@ function simpleAssets(){
 
 function simpleAssetRows(){
  const rows=simpleAssets();
- return `<p class="form-hint">${rows.length} de ${S.assets.length} ativo(s) · a análise completa fica em Ver análise. ${simpleFilters.query||simpleFilters.type||simpleFilters.market||simpleFilters.sector||simpleFilters.ownership!=='all'?button('simple-reset','Limpar filtros','text-button'):''}</p>${rows.length?`<div class="table-wrap"><table class="simple-assets-table"><thead><tr><th>Ativo</th><th>Tipo / mercado</th><th>Análise</th><th>Cotação em reais</th><th>Minha posição</th><th></th></tr></thead><tbody>${rows.map(a=>`<tr><td><b>${esc(a.ticker)}</b><small>${esc(a.name)}</small><small>${esc(a.sector)}</small></td><td data-label="Tipo / mercado">${esc(typeLabel(a))}<small>${esc(simpleMarketLabel(a))}</small></td><td data-label="Análise">${simpleAssetStatus(a)}</td><td data-label="Cotação em reais">${money(a.metrics.price)}<small>${dt(a.snapshots.quote?.asof)}${a.snapshots.quote&&age(a.snapshots.quote.asof)>7?' · atualizar':''}</small></td><td data-label="Minha posição">${a.position.quantity>0?`${money(a.value)}<small>${fmt(a.position.quantity,8)} unidade(s)${a.value_at_cost?' · pelo custo':''}</small>`:tag('Acompanhando')}</td><td>${button('detail','Ver análise','secondary',`data-id="${a.id}"`)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="notice">Nenhum ativo neste filtro. Ajuste os filtros ou adicione um investimento à sua lista.</p>'}`;
+ const total=S.assets.length,noun=total===1?'ativo':'ativos';
+ const count=rows.length===total?`${total} ${noun}`:`${rows.length} de ${total} ${noun}`;
+ const summary=`<p class="form-hint asset-result-count">${count} ${simpleFilters.query||simpleFilters.type||simpleFilters.market||simpleFilters.sector||simpleFilters.ownership!=='all'?button('simple-reset','Limpar filtros','text-button'):''}</p>`;
+ if(!rows.length)return summary+'<p class="notice">Nenhum ativo neste filtro. Ajuste os filtros ou adicione um investimento à sua lista.</p>';
+ const quoteDate=a=>dt(a.snapshots.quote?.asof)+(a.snapshots.quote&&age(a.snapshots.quote.asof)>7?' · atualizar':'');
+ if(phoneLayout.matches){
+  const quote=a=>a.metrics.price==null?'<small>Sem cotação</small>':`<span class="sr-only">Cotação </span><strong>${money(a.metrics.price)}</strong>${a.snapshots.quote?.asof?`<small>${quoteDate(a)}</small>`:''}`;
+  return summary+`<ul class="phone-asset-list">${rows.map(a=>`<li><button type="button" data-action="detail" data-id="${a.id}"><span><span class="sr-only">Ver análise de </span><strong>${esc(a.ticker)}</strong><small>${esc(a.name)}</small><small>${esc(typeLabel(a))}${a.position.quantity>0?' · Na carteira':''}</small></span><span class="phone-asset-quote">${quote(a)}</span><span class="phone-asset-arrow" aria-hidden="true">›</span></button></li>`).join('')}</ul>`;
+ }
+ return summary+`<div class="table-wrap"><table class="simple-assets-table"><thead><tr><th>Ativo</th><th>Tipo / mercado</th><th>Análise</th><th>Cotação em reais</th><th>Minha posição</th><th></th></tr></thead><tbody>${rows.map(a=>`<tr><td><b>${esc(a.ticker)}</b><small>${esc(a.name)}</small><small>${esc(a.sector)}</small></td><td data-label="Tipo / mercado">${esc(typeLabel(a))}<small>${esc(simpleMarketLabel(a))}</small></td><td data-label="Análise">${simpleAssetStatus(a)}</td><td data-label="Cotação em reais">${money(a.metrics.price)}<small>${quoteDate(a)}</small></td><td data-label="Minha posição">${a.position.quantity>0?`${money(a.value)}<small>${fmt(a.position.quantity,8)} unidade(s)${a.value_at_cost?' · pelo custo':''}</small>`:tag('Acompanhando')}</td><td>${button('detail','Ver análise','secondary',`data-id="${a.id}"`)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 watchlist=function(){
@@ -122,6 +146,7 @@ goalsView=function(){
  const a=S.allocation;
  return page('Metas e limites','Defina as referências usadas no seu próximo aporte.')+
  `<div class="grid-two"><section class="panel"><h2>Distribuição atual</h2><div class="card-value">${money(a.total)}</div>${allocationBars()}<p class="form-hint">Barra: peso atual · traço: sua meta. ${a.issues.length?'Há saldos ou classificações a revisar.':''}</p></section><section class="panel"><h2>Minhas metas por classe</h2><form id="goals-form"><div class="form-grid">${Object.entries(S.allocation_classes).map(([key,label])=>numField('goal_'+key,label+' (%)',S.settings.allocation_targets?.[key]??'','required min="0" max="100"')).join('')}</div><p id="goals-sum" class="form-hint">${a.has_targets?'Total: 100%':'Preencha as metas; a soma precisa ser 100%.'}</p><div class="form-error" role="alert"></div><button type="submit" class="button">Salvar minhas metas</button></form></section></div>
+ ${allocationModelPanel()}
  <section class="panel"><h2>Limites de concentração</h2><p>${pct(S.settings.asset_limit)} por emissor e ${pct(S.settings.sector_limit)} por setor da carteira negociada.</p><div class="actions">${simpleViewLink('settings','Ajustar meus limites')}${simpleViewLink('long-term','Voltar à sugestão de aporte','')}</div></section>
  <details class="panel simple-fold"><summary>Conferir a classe de cada investimento</summary><p>A classificação orienta suas metas. Para fundos e ETFs, confira a composição.</p><form id="class-form"><div class="classification-list">${a.items.map(r=>`<div><b>${esc(r.name)}</b><small>${r.held?'Na carteira':'Acompanhando'} · ${money(r.value)}</small>${select(r.key,'Classe de '+r.name,Object.entries(S.allocation_classes),r.class)}</div>`).join('')}</div><div class="form-error" role="alert"></div><button class="button" type="submit">Salvar classificação</button></form></details>`;
 };
@@ -173,15 +198,17 @@ function simpleAIMode(form){const tools=$('.simple-ai-tools',form),advanced=$('.
 
 function simpleSessionControls(){
  const restart=$('#restart-vault'),exit=$('#exit-vault');
- if(!restart&&!exit){placeSessionControls();return;}
+ if(!restart&&!exit){placePhoneTools();return;}
  let menu=$('#app-session-menu');
  if(!menu){menu=document.createElement('details');menu.id='app-session-menu';menu.className='app-session-menu';menu.innerHTML='<summary>Aplicativo</summary><div class="app-session-choices"></div>';$('.header-actions').append(menu);}
  for(const b of [restart,exit])if(b)$('.app-session-choices',menu).append(b);
- placeSessionControls();
+ placePhoneTools();
 }
 
-function placeSessionControls(){
+function placePhoneTools(){
  const target=phoneLayout.matches?$('#phone-menu-tools'):$('.header-actions');
+ const integrations=$('#open-integrations');
+ if(integrations&&integrations.parentElement!==target)target.prepend(integrations);
  for(const control of [$('#lock-vault'),$('#app-session-menu')]){
   if(control&&control.parentElement!==target)target.append(control);
  }
@@ -206,6 +233,7 @@ function simpleTidy(){
   d.innerHTML='<summary>'+simpleFilterLabel()+'</summary><div class="form-grid"></div>';
   for(const name of ['market','ownership','sector'])$('.form-grid',d).append(f.elements[name].closest('.field'));
   f.append(d);
+  placeAssetTypeFilter(f);
  }
  if(view==='long-term')simpleContribution(root);
  if(view==='portfolio'){
@@ -225,19 +253,33 @@ render=function(){
  if(!S)return simpleBaseRender();
  if(view==='global'){simpleFilters.market=view==='us'?'US':'GLOBAL';view='watchlist';history.replaceState(null,'','#watchlist');}
  simpleBaseRender();if(!S||document.body.classList.contains('vault-locked'))return;
+ $('#main').dataset.route=view;
  simpleTidy();simpleNavigation();simpleSessionControls();
  if(view==='portfolio'||view==='income')phoneTableCards($('#main'));
 };
 
-function simpleFilterLabel(){const count=Number(!!simpleFilters.market)+Number(!!simpleFilters.sector)+Number(simpleFilters.ownership!=='all');return 'Mais filtros'+(count?' · '+count+' ativo(s)':'');}
-bindForms=function(){simpleBaseBind();const mode=$('#long-term-form [name=mode]');if(mode&&!mode.dataset.simpleBound){mode.dataset.simpleBound='true';mode.addEventListener('change',()=>simpleAIMode(mode.form));}const f=$('#simple-filter-form');if(f&&!f.dataset.bound){f.dataset.bound='true';f.addEventListener('submit',e=>e.preventDefault());
+function simpleFilterLabel(){const count=Number(!!simpleFilters.market)+Number(!!simpleFilters.sector)+Number(simpleFilters.ownership!=='all')+Number(phoneLayout.matches&&!!simpleFilters.type);return 'Mais filtros'+(count?' · '+count:'');}
+function placeAssetTypeFilter(form){
+ const type=form.elements.type.closest('.field'),details=$('details',form);
+ const target=phoneLayout.matches?$('.form-grid',details):$('.form-grid',form);
+ if(type.parentElement!==target){if(phoneLayout.matches)target.prepend(type);else target.append(type);}
+ $('summary',details).textContent=simpleFilterLabel();
+}
+bindForms=function(){simpleBaseBind();if(view==='retirement')bindRetirement();const mode=$('#long-term-form [name=mode]');if(mode&&!mode.dataset.simpleBound){mode.dataset.simpleBound='true';mode.addEventListener('change',()=>simpleAIMode(mode.form));}const f=$('#simple-filter-form');if(f&&!f.dataset.bound){f.dataset.bound='true';f.addEventListener('submit',e=>e.preventDefault());
  const update=()=>{const next=formData(f);if(Object.keys(next).every(k=>next[k]===simpleFilters[k]))return;simpleFilters=next;$('#simple-assets-result').innerHTML=simpleAssetRows();const summary=$('details > summary',f);if(summary)summary.textContent=simpleFilterLabel();};f.addEventListener('input',update);f.addEventListener('change',update);}};
 
 document.addEventListener('invalid',e=>{const d=e.target.closest('details');if(d)d.open=true;},true);
-phoneLayout.addEventListener('change',e=>{if(!e.matches)$('#phone-menu').close();placeSessionControls();});
+$('#phone-menu').addEventListener('close',()=>$('#phone-more')?.setAttribute('aria-expanded','false'));
+phoneLayout.addEventListener('change',e=>{
+ if(!e.matches)$('#phone-menu').close();
+ placePhoneTools();
+ const results=$('#simple-assets-result');
+ if(results&&S){placeAssetTypeFilter($('#simple-filter-form'));results.innerHTML=simpleAssetRows();}
+});
 document.addEventListener('click',e=>{
  const menu=$('#phone-menu');
- if(e.target.closest('#phone-more')){menu.showModal();return;}
+ const more=e.target.closest('#phone-more');
+ if(more){menu.showModal();more.setAttribute('aria-expanded','true');return;}
  if(e.target===menu&&e.clientY<menu.getBoundingClientRect().top){menu.close();return;}
  if(menu.open&&e.target.closest('#phone-menu-tools button')){menu.close();return;}
  if(!phoneLayout.matches||!e.target.closest('[data-view]'))return;
@@ -245,6 +287,12 @@ document.addEventListener('click',e=>{
  const heading=$('#main h1');
  if(heading&&!$('#modal').open){window.scrollTo(0,0);heading.tabIndex=-1;heading.focus({preventScroll:true});}
 });
+
+window.AporteMobile={closeOverlay(){
+ const dialog=$$('dialog[open]').at(-1);
+ if(dialog){dialog.close();return true;}
+ return window.AporteTheme?.close()??false;
+}};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;
  if(b.dataset.action==='simple-reset'){simpleFilters={query:'',type:'',market:'',ownership:'all',sector:''};render();}
  if(b.dataset.action==='simple-add')modal('Adicionar à minha lista',`<p>Escolha onde o investimento é negociado. Todos aparecem na mesma lista.</p><div class="task-cards"><article><h3>Brasil</h3><p>Ações, FIIs, ETFs, BDRs e Bitcoin.</p>${button('asset','Escolher ativo','')}</article><article><h3>Estados Unidos</h3><p>Stocks e ETFs negociados nos EUA.</p>${button('us-add','Cadastrar nos EUA','')}</article><article><h3>Outras bolsas</h3><p>Stocks internacionais e ETFs globais.</p>${button('global-add','Cadastrar no exterior','')}</article></div>`);

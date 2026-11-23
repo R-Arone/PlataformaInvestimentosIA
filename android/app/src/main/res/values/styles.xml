@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AporteTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#EDF4F0</item>
+        <item name="android:statusBarColor">#EDF4F0</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#103E30</item>
+    </style>
+</resources>

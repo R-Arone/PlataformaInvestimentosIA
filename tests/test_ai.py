@@ -7,6 +7,7 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from aporte_brasil.ai import market_ai as ai
 import test_app as baseline
@@ -169,6 +170,35 @@ class AITests(unittest.TestCase):
         self.assertEqual(len(calls), 3)
         self.assertTrue(all(url.startswith('https://ollama.com/api/web_') for url, _, _ in calls))
 
+    def test_web_connection_checks_search_and_fetch_independently_of_local_model(self):
+        ai.action(app, '/api/ai/settings', {'search_key': 'synthetic-key'})
+        found = {'results': [{'url': 'https://example.org/policy', 'title': 'Banco Central'}]}
+        with patch.object(ai, 'request', side_effect=[found, {'content': ''}]) as request:
+            result = ai.action(app, '/api/ai/web-connection', {})
+        self.assertEqual((result['sources'], result['pages_read']), (1, 0))
+        self.assertIn('sem texto', result['warnings'][0])
+        self.assertEqual([call.args[0] for call in request.call_args_list], [ai.WEB_API+'web_search', ai.WEB_API+'web_fetch'])
+        self.assertIn('Banco Central', request.call_args_list[0].args[1]['query'])
+
+    def test_web_http_errors_report_status_without_exposing_credentials(self):
+        url = ai.WEB_API + 'web_search'
+        key = 'synthetic-key'
+        for code, message in ((401, 'autenticou'), (402, 'pagamento'), (429, 'limite'), (502, 'recusou')):
+            with self.subTest(code=code), patch.object(ai.urllib.request, 'build_opener') as opener:
+                opener.return_value.open.side_effect = HTTPError(url, code, key, None, None)
+                with self.assertRaisesRegex(ValueError, rf'{message}.*HTTP {code}') as error:
+                    ai.request(url, {'query': 'consulta pública'}, key)
+                self.assertNotIn(key, str(error.exception))
+
+    def test_later_query_error_keeps_web_evidence_from_first_query(self):
+        ai.action(app, '/api/ai/settings', {'search_key': 'synthetic-key'})
+        found = {'results': [{'url': 'https://example.org/company', 'title': 'Evidência pública'}]}
+        responses = [found, {'content': 'Texto da página consultada.'}, ValueError('Limite de consultas atingido.')]
+        with patch.object(ai, 'request', side_effect=responses):
+            sources, warnings = ai.research(app, 'Empresa pública', queries=['Primeira consulta', 'Segunda consulta'])
+        self.assertEqual([source['kind'] for source in sources], ['page_read'])
+        self.assertIn('Limite de consultas', warnings[0])
+
     def test_provider_structured_outputs_and_local_api(self):
         response = {'message': {'content': json.dumps(self.analysis())}, 'done': True}
         with patch.object(ai, 'request', return_value=response) as req:
@@ -181,6 +211,35 @@ class AITests(unittest.TestCase):
         with patch.object(ai, 'request', return_value=response) as req:
             ai.generate({**ai.DEFAULTS, 'provider': 'llamacpp', 'base_url': 'http://127.0.0.1:8080', 'model': 'local'}, 'System', {}, ai.SCENARIO_SCHEMA)
             self.assertTrue(req.call_args.args[0].endswith('/v1/chat/completions'))
+
+    def test_integration_check_runs_in_background_and_verifies_local_extraction(self):
+        before = ai.config(app)
+        old_job = ai.job_state()
+        d = {'mode': 'model', 'model': 'qwen2.5:7b'}
+        try:
+            for outcome, succeeds in (({'founded_year': 1984, 'source_id': 1}, True),
+                                      ({'founded_year': 1984, 'source_id': True}, False),
+                                      ({'founded_year': 1985, 'source_id': 1}, False)):
+                with self.subTest(outcome=outcome):
+                    response = {'message': {'content': json.dumps(outcome)}}
+                    with patch.object(ai, 'request', return_value=response) as request:
+                        job = ai.action(app, '/api/ai/integration-check', d)
+                        deadline = time.monotonic() + 3
+                        while ai.job_state()['running'] and time.monotonic() < deadline:
+                            time.sleep(.01)
+                    end = ai.job_state()
+                    self.assertEqual(end['id'], job['id'])
+                    self.assertFalse(end['running'])
+                    self.assertEqual(not end['error'], succeeds)
+                    self.assertEqual(request.call_args.args[0], ai.DEFAULTS['base_url'] + '/api/chat')
+                    self.assertEqual(request.call_args.args[1]['model'], 'qwen2.5:7b')
+                    self.assertIn('Empresa Exemplo', request.call_args.args[1]['messages'][1]['content'])
+            self.assertEqual(ai.config(app), before)
+            with self.assertRaises(ValueError):
+                ai.action(app, '/api/ai/integration-check', {**d, 'base_url': 'https://example.org'})
+        finally:
+            with ai.LOCK:
+                ai.JOB.update(old_job)
 
     def test_backup_restores_scenarios_rejects_tampering_and_preserves_no_key(self):
         aid = self.asset(sector='Varejo')

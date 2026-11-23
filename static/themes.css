@@ -1,5 +1,26 @@
 /* Temas do Aporte Brasil. O tema Claro é o visual original e não recebe nenhuma regra de substituição. */
 :root[data-theme="claro"],.theme-pv[data-pv="claro"]{--bg:#f1f5f9;--surf:#ffffff;--surf2:#f7fafc;--surf3:#ecf2f7;--line:#dce5ed;--ink:#173149;--muted:#60748a;--side-bg:#0c2135;--side-ink:#d2e0eb;--green:#007c57;--mint:#56e6ad;--red:#b43d40;--amber:#926000;--on-primary:#ffffff;--navy:#0c2135;color-scheme:light}
+:root[data-theme="jade"],.theme-pv[data-pv="jade"] {
+  --bg:#edf4f0; --surf:#fff; --surf2:#f5f9f6; --surf3:#dcece4; --line:#d6e4dc;
+  --ink:#132f26; --muted:#486358; --side-bg:#103e30; --side-ink:#ddf2e9;
+  --green:#126547; --mint:#9be8c8; --red:#ab333b; --amber:#795100; --on-primary:#fff; --navy:#103d30;
+  --feature-end:#1b5c47; --feature-note:#c8eddc;
+  color-scheme:light;
+}
+:root[data-theme="areia"],.theme-pv[data-pv="areia"] {
+  --bg:#f6f0e7; --surf:#fffcf7; --surf2:#f9f3e9; --surf3:#f0e1ce; --line:#e6d9c7;
+  --ink:#33271d; --muted:#685648; --side-bg:#513422; --side-ink:#f7e5d3;
+  --green:#80502d; --mint:#f7c99a; --red:#a53639; --amber:#80520b; --on-primary:#fff; --navy:#513422;
+  --feature-end:#70492d; --feature-note:#f7e0c9;
+  color-scheme:light;
+}
+:root[data-theme="meia-noite"],.theme-pv[data-pv="meia-noite"] {
+  --bg:#0d1724; --surf:#162334; --surf2:#1b2a3d; --surf3:#263c51; --line:#33485f;
+  --ink:#eef5ff; --muted:#afc0d5; --side-bg:#0b1421; --side-ink:#d6e5f7;
+  --green:#8adfc3; --mint:#8adfc3; --red:#ff9d9b; --amber:#f1cb86; --on-primary:#102b2a; --navy:#162b42;
+  --feature-end:#254765; --feature-note:#c6e5f4;
+  color-scheme:dark;
+}
 :root[data-theme="noturno"],.theme-pv[data-pv="noturno"]{--bg:#0f1720;--surf:#17212c;--surf2:#1c2835;--surf3:#243241;--line:#2b3a4a;--ink:#e4ecf3;--muted:#97a9bb;--side-bg:#0a1119;--side-ink:#d2e0eb;--green:#3ddc97;--mint:#56e6ad;--red:#ff7b7f;--amber:#f0b84a;--on-primary:#04231a;--navy:#0a1119;color-scheme:dark}
 :root[data-theme="dracula"],.theme-pv[data-pv="dracula"]{--bg:#282a36;--surf:#303241;--surf2:#363849;--surf3:#3e4157;--line:#44475a;--ink:#f8f8f2;--muted:#a4adcf;--side-bg:#21222c;--side-ink:#e6e6f0;--green:#50fa7b;--mint:#bd93f9;--red:#ff6e6e;--amber:#ffb86c;--on-primary:#13261a;--navy:#21222c;color-scheme:dark}
 :root[data-theme="nord"],.theme-pv[data-pv="nord"]{--bg:#2e3440;--surf:#3b4252;--surf2:#414a5c;--surf3:#4a5469;--line:#4c566a;--ink:#eceff4;--muted:#aab4c8;--side-bg:#242933;--side-ink:#d8dee9;--green:#a3be8c;--mint:#88c0d0;--red:#e58892;--amber:#ebcb8b;--on-primary:#1d2418;--navy:#242933;color-scheme:dark}

@@ -1,7 +1,7 @@
 'use strict';
 let installerState=null,installerTimer=null,installerFetching=false,installerSending=false;
 const installerBaseRender=render;
-render=function(){installerBaseRender();if(S&&view==='settings'){
+render=function(){installerBaseRender();if(S&&view==='settings'&&!nativeAndroid){
  $('#main').insertAdjacentHTML('afterbegin','<section class="panel" id="installer-panel" aria-labelledby="installer-heading"></section>');
  drawInstaller();pollInstaller();
 }};

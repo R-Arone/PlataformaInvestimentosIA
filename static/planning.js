@@ -34,6 +34,84 @@ function reconciliationPanel(p,root){
 }
 
 function allocationBars(){return `<div class="goal-bars">${S.allocation.classes.map(r=>`<div class="goal-row"><div><b>${esc(r.label)}</b><span>${money(r.value)} · ${pct(r.weight)}${r.target!==null?' / meta '+pct(r.target):''}</span></div><div class="goal-track"><div style="width:${Math.max(0,Math.min(100,r.weight))}%"></div>${r.target!==null?`<i style="left:${r.target}%" title="Meta ${pct(r.target)}"></i>`:''}</div></div>`).join('')}</div>`;}
+
+const allocationModels={
+ balanced:{label:'60/40 · ações e renda fixa',description:'60% em ações e 40% em renda fixa. Você escolhe quanto da parcela de ações fica no Brasil.',source:'Vanguard · carteira 60/40',url:'https://corporate.vanguard.com/content/corporatesite/us/en/corp/articles/focus-long-term-market-results.html'},
+ equal:{label:'1/N · pesos iguais',description:'Divida o capital igualmente entre as classes escolhidas. É uma referência simples para comparar com métodos que estimam retornos e risco. A divisão de capital pode concentrar risco nas classes mais voláteis.',source:'DeMiguel, Garlappi e Uppal (2009)',url:'https://doi.org/10.1093/rfs/hhm075'},
+ core:{label:'Núcleo–satélite',description:'Neste exemplo, o núcleo é dividido entre renda fixa e ações amplas no exterior. Os satélites são divididos entre ações brasileiras e FIIs. Ajuste o espaço reservado às teses específicas.',source:'Morningstar · abordagem núcleo–satélite',url:'https://global.morningstar.com/en-gb/personal-finance/how-to-build-a-core-and-satellite-portfolio'},
+};
+
+function allocationModelWeights(model, share, classes){
+ const weights={rf:0,national:0,international:0,fii:0,crypto:0,other:0};
+ if(model==='equal'){
+  if(classes.length<2)return null;
+  const base=Math.floor(10000/classes.length),remainder=10000%classes.length;
+  classes.forEach((key,i)=>{weights[key]=base+Number(i<remainder);});
+ }else{
+  if(share==null||!Number.isFinite(share)||share<0||share>100)return null;
+  if(model==='balanced'){
+   weights.rf=4000;
+   weights.national=Math.round(60*share);
+   weights.international=6000-weights.national;
+  }else{
+   const satellite=Math.round(100*share),core=10000-satellite;
+   weights.rf=Math.round(core/2);
+   weights.international=core-weights.rf;
+   weights.national=Math.round(satellite/2);
+   weights.fii=satellite-weights.national;
+  }
+ }
+ return Object.fromEntries(Object.entries(weights).map(([key,bps])=>[key,bps/100]));
+}
+
+function allocationModelPanel(){
+ const classes=Object.entries(S.allocation_classes).filter(([k])=>k!=='other');
+ return `<section class="panel" id="allocation-models"><h2>Modelos de composição</h2>
+ <p>Compare pesos por classe. Os percentuais dentro de cada bloco são premissas editáveis do simulador.</p>
+ <div class="form-grid">${select('allocation_model','Método',Object.entries(allocationModels).map(([k,v])=>[k,v.label]),'balanced')}
+ <div data-model-input="balanced">${numField('domestic_equity_share','Brasil na parcela de ações (%)',30,'min="0" max="100"')}</div>
+ <div data-model-input="core" hidden>${numField('satellite_share','Satélites (% da carteira)',20,'min="0" max="100"')}</div></div>
+ <fieldset data-model-input="equal" hidden><legend>Classes com pesos iguais</legend>${classes.map(([k,label])=>`<label class="check-line"><input type="checkbox" name="equal_classes" value="${esc(k)}" ${k==='crypto'?'':'checked'}> ${esc(label)}</label>`).join('')}</fieldset>
+ <div id="allocation-model-result">${allocationModelResult('balanced',allocationModelWeights('balanced',30,[]))}</div>
+ <div class="actions">${button('allocation-model-copy','Copiar pesos para minhas metas')}</div>
+ <p class="form-hint">Confira a composição dos fundos e a exposição cambial. A categoria Internacional também pode conter produtos fora da parcela de ações.</p></section>`;
+}
+
+function allocationModelResult(model, weights){
+ const {description,source,url}=allocationModels[model];
+ const intro=`<p>${esc(description)} <a href="${esc(url)}" target="_blank" rel="noreferrer">${esc(source)} ↗</a></p>`;
+ if(!weights)return intro+`<p role="status">${model==='equal'?'Escolha pelo menos duas classes.':'Informe um percentual entre 0 e 100.'}</p>`;
+ const rows=S.allocation.classes.map(({key,label,weight,target})=>{
+  const gap=weights[key]-weight;
+  return `<tr><th scope="row">${esc(label)}</th><td>${S.allocation.total?pct(weight):'—'}</td><td>${pct(target)}</td><td>${pct(weights[key])}</td><td>${S.allocation.total?(gap>=0.005?'+':'')+fmt(Math.abs(gap)<0.005?0:gap)+' p.p.':'—'}</td></tr>`;
+ });
+ return intro+`<div class="table-wrap"><table><thead><tr><th scope="col">Classe</th><th scope="col">Atual</th><th scope="col">Meta salva</th><th scope="col">Modelo</th><th scope="col">Modelo − atual</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+}
+
+function readAllocationModel(panel){
+ const model=$('[name=allocation_model]',panel).value;
+ const input=$(model==='core'?'[name=satellite_share]':'[name=domestic_equity_share]',panel);
+ const classes=$$('[name=equal_classes]:checked',panel).map(el=>el.value);
+ return {model,weights:allocationModelWeights(model,input.valueAsNumber,classes)};
+}
+
+document.addEventListener('input',e=>{
+ const panel=e.target.closest('#allocation-models');if(!panel)return;
+ const {model,weights}=readAllocationModel(panel);
+ $$('[data-model-input]',panel).forEach(node=>{node.hidden=node.dataset.modelInput!==model;});
+ $('#allocation-model-result',panel).innerHTML=allocationModelResult(model,weights);
+ $('[data-action=allocation-model-copy]',panel).disabled=!weights;
+});
+
+document.addEventListener('click',e=>{
+ const b=e.target.closest('[data-action=allocation-model-copy]');if(!b)return;
+ const form=$('#goals-form'),{weights}=readAllocationModel(b.closest('#allocation-models'));if(!form||!weights)return;
+ for(const [key,value] of Object.entries(weights))form.elements['goal_'+key].value=value;
+ const first=form.elements.goal_rf;
+ first.dispatchEvent(new Event('input',{bubbles:true}));
+ first.focus();
+ toast('Pesos copiados para edição. Clique em Salvar minhas metas para confirmar.');
+});
 function goalsView(){const a=S.allocation;return page('Minhas metas e próximo aporte','Seu plano por classe, com carteira atual, concentração e juros como referências.')+`<div class="grid-two"><section class="panel"><h2>Onde está meu patrimônio</h2><div class="card-value">${money(a.total)}</div><p class="form-hint">Cotações e saldos em reais · ${a.issues.length?'há estimativas para revisar':'base disponível'}</p>${allocationBars()}<p class="legend">Barra: peso atual · traço: sua meta</p></section><section class="panel"><h2>Minha meta</h2><p>Escolha seus percentuais. Não há uma distribuição sugerida automaticamente. A soma precisa ser 100%.</p><form id="goals-form"><div class="form-grid">${Object.entries(S.allocation_classes).map(([k,label])=>numField('goal_'+k,label+' (%)',S.settings.allocation_targets?.[k]??'','required min="0" max="100"')).join('')}</div><p id="goals-sum" class="form-hint">Total: ${S.settings.allocation_targets?'100%':'preencha as metas'}</p><div class="form-error" role="alert"></div><button class="button" type="submit">Salvar minhas metas</button></form></section></div><section class="panel"><h2>Quanto vou aportar agora?</h2><form id="aporte-form"><div class="form-grid">${numField('amount','Novo aporte (R$)',contributionChoice.amount,'required min="0.01" placeholder="Informe o valor"')}${contributionFields()}</div>${a.issues.length?`<details open class="notice warn"><summary>${a.issues.length} ponto(s) na base da carteira</summary><ul>${a.issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details><label class="check"><input name="accept_estimates" type="checkbox">Entendo essas pendências e quero simular usando os saldos estimados.</label>`:''}<div class="form-error" role="alert"></div><button type="submit" class="button" ${a.has_targets?'':'disabled'}>Simular distribuição do aporte</button>${a.has_targets?'':'<p class="form-hint">Salve suas metas para liberar a simulação.</p>'}</form><div id="aporte-result">${aportePlan?planResult(aportePlan):''}</div></section><details class="panel"><summary>Conferir a classe de cada investimento</summary><p>ETFs e fundos dependem de sua exposição. Confira a estratégia do produto; fundos mistos não têm uma classe presumida. A classificação salva aqui só muda suas metas.</p><form id="class-form"><div class="classification-list">${a.items.map(r=>`<div><b>${esc(r.name)}</b><small>${r.held?'Na carteira':'Acompanhando'} · ${money(r.value)}${r.manual?' · classe escolhida por você':''}</small>${select(r.key,'Classe de '+r.name,Object.entries(S.allocation_classes),r.class)}</div>`).join('')}</div><div class="form-error" role="alert"></div><button class="button" type="submit">Salvar classificação</button></form></details><section class="panel"><h2>Como ler a prioridade</h2><p>O orçamento por classe vem de suas metas. A lista de ações usa o comparador e os critérios por setor para orientar a pesquisa. Falta de informação não é aprovação; uma nota alta não prevê ganho.</p><p>Os limites por ativo e setor são medidos dentro da renda variável. Atualize saldos, revise prazo, liquidez, risco de crédito e o papel de cada produto na carteira.</p><a href="${esc(a.reference)}" target="_blank" rel="noreferrer">CVM · diversificação e risco ↗</a></section>`;}
 function planResult(p){return `<div class="subheading"><h2>Distribuição para ${money(p.amount)}</h2><p>As classes já acima da meta podem receber zero. O valor é dividido proporcionalmente ao que falta após o aporte.</p><div class="table-wrap"><table><thead><tr><th>Classe</th><th>Hoje</th><th>Meta</th><th>Aporte simulado</th><th>Depois</th></tr></thead><tbody>${p.classes.map(r=>`<tr><td>${esc(r.label)}</td><td>${pct(r.weight)}</td><td>${pct(r.target)}</td><td><b>${money(r.amount)}</b></td><td>${pct(r.after_weight)}</td></tr>`).join('')}</tbody></table></div><div class="notice">${p.benchmark?`Referência de juros: CDB a 100% do CDI (${pct(p.benchmark.cdi)} a.a., ${dt(p.benchmark.asof)}), sem tarifas, por 12 meses: ${pct(p.benchmark.annual_net)} líquido no cenário, com IR de ${pct(p.benchmark.tax)} sobre o ganho. Taxa constante; não é uma cotação de produto. Fonte: ${esc(p.benchmark.source)}.`:'CDI ausente ou antigo: atualize os juros para ver a referência líquida de renda fixa.'}</div><h3>Ações para estudar dentro desse plano</h3>${p.candidates.length?`<div class="table-wrap"><table><thead><tr><th>Ativo</th><th>Situação</th><th>Nota de pesquisa</th><th>Motivo / pendências</th></tr></thead><tbody>${p.candidates.map(r=>`<tr><td>${button('detail',r.ticker,'subtle',`data-id="${r.id}"`)}<small>${r.held?'Já tenho':'Nova na lista'}</small></td><td>${r.eligible?tag('Estudar','good'):tag('Revisar','warn')}</td><td>${r.score===null?'—':fmt(r.score,1)+'/100'}</td><td>${r.reasons.length?r.reasons.map(esc).join(' · '):'Classe recebe aporte, dentro dos limites e com nota calculável.'}${r.pending?`<small>${r.pending} critério(s) sem avaliação concluída. Confira antes de decidir.</small>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p>Nenhuma ação cadastrada.</p>'}<p class="form-hint">${esc(p.method)}</p><p>${esc(p.note)}</p></div>`;}
 

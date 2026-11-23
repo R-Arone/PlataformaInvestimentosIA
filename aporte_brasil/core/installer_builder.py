@@ -21,10 +21,16 @@ import zipfile
 
 from tools.check_git_safety import MODULES
 
-STATIC = ('index.html', 'app.js', 'expanded.js', 'research.js', 'insights.js',
-          'developments.js', 'planning.js', 'decisions.js', 'context.js', 'ai.js', 'exposures.js', 'quality.js', 'international.js',
-          'positions.js', 'signals.js', 'models.js', 'model-comparison-data.json', 'us.js', 'security.js', 'installer.js',
-          'stocks.js', 'buy-hold.js', 'fii-research.js', 'company-model.js', 'factor-analysis.js', 'intelligence.js', 'tesouro.js', 'style.css', 'mobile.css', 'favicon.svg')
+STATIC = (
+    'accessibility.js', 'ai.js', 'aporte-cards.js', 'app.js', 'b3-fixed.js', 'b3-notes.js',
+    'b3-pluggy.js', 'b3-sync.js', 'buy-hold.js', 'company-model.js', 'completion.js', 'context.js',
+    'decisions.js', 'developments.js', 'expanded.js', 'exposures.js', 'factor-analysis.js', 'favicon.svg',
+    'fii-research.js', 'fixed-income.js', 'index.html', 'insights.js', 'installer.js', 'intelligence.js',
+    'international.js', 'investment-context.js', 'long-term.js', 'mobile.css', 'models.js', 'multiples.js',
+    'navigation.js', 'planning.js', 'positions.js', 'price-context.js', 'quality.js', 'research-dashboard.js',
+    'research.js', 'retirement.js', 'security.js', 'signals.js', 'stocks.js', 'style.css', 'tesouro.js',
+    'themes.css', 'themes.js', 'us.js', 'valuation-choice.js',
+)
 PACKAGING = ('Instalar.cmd', 'Install.ps1', 'Uninstall.ps1', 'LEIA-ME.txt')
 EXCLUDED = ('torch', 'transformers', 'chronos', 'numpy', 'scipy', 'pandas',
             'matplotlib', 'PIL', 'IPython', 'pytest', 'tkinter')

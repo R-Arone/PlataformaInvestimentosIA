@@ -29,6 +29,7 @@ LOCK = threading.RLock()
 HF_LOCK = threading.Lock()
 HF_PIPE = None
 HF_CACHE = None
+WEB_API = 'https://ollama.com/api/'
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -54,13 +55,26 @@ def request(url, payload=None, token='', timeout=20):
             raise ValueError('A resposta da IA excedeu o limite.')
         return json.loads(raw)
     except urllib.error.HTTPError as exc:
+        if url.startswith(WEB_API):
+            message = {
+                400: 'O Ollama rejeitou os dados da consulta web.',
+                401: 'O Ollama não autenticou a chave de busca.',
+                402: 'O Ollama respondeu com uma exigência de pagamento para esta consulta.',
+                403: 'O Ollama recusou o acesso da conta à pesquisa.',
+                429: 'Ollama atingiu o limite de consultas desta conta.',
+            }.get(exc.code, 'A API de busca do Ollama recusou a consulta.')
+            raise ValueError(f'{message} (HTTP {exc.code})') from None
         raise ValueError({401: 'Chave da pesquisa inválida.', 403: 'Acesso à pesquisa recusado.',
                           404: 'Modelo ou API não encontrado.', 429: 'Limite de consultas atingido.'}.get(exc.code, 'A API de IA recusou a consulta.')) from None
     except TimeoutError:
+        if url.startswith(WEB_API):
+            raise ValueError('O serviço de busca Ollama excedeu o tempo de resposta.') from None
         raise ValueError('A consulta de IA excedeu o tempo disponível. Escolha um modelo menor ou simplifique a pergunta.') from None
     except (OSError, ValueError) as exc:
         if isinstance(exc, ValueError) and not isinstance(exc, json.JSONDecodeError):
             raise
+        if url.startswith(WEB_API):
+            raise ValueError('Serviço de busca Ollama inacessível ou resposta inválida.') from None
         raise ValueError('IA indisponível ou resposta inválida. Confira o servidor local e tente novamente.') from None
 
 
@@ -100,6 +114,7 @@ def public_state(app, c, assets=None, fixed=None):
     for profile, report in reports.items():
         report['stale'] = report['input_hash'] != fingerprint(feeds.get(profile, {})) or app.age(report['analyzed_at']) > 1
     return {'settings': cfg, 'sentiment': reports, 'scenarios': app.read_cache(c, 'ai_scenarios', [])[-20:][::-1],
+            'integration_check_available': True,
             'job': job_state(), 'hf_model': HF_MODEL, 'import_preview': import_preview(app),
             'company_batch': app.read_cache(c,'issuer_batch',None),
             'market_batch':app.read_cache(c,'market_batch',None),
@@ -127,33 +142,46 @@ def models(cfg):
     return names[:100]
 
 
+def connection_settings(app, d):
+    if not isinstance(d, dict) or set(d) - {'provider', 'base_url', 'model'}:
+        raise ValueError('Informe somente a conexão local para testar.')
+    return validate_settings(app, d)[0]
+
+
+def selected_model(cfg, names):
+    return cfg['model'] or next((n for n in names if ':3b' in n.lower()), names[0])
+
+
 def connection(app,d):
-    if not isinstance(d,dict) or set(d)-{'provider','base_url','model'}:raise ValueError('Informe somente a conexão local para testar.')
-    cfg,_=validate_settings(app,d);names=models(cfg)
-    selected=cfg['model'] or next((n for n in names if ':3b' in n.lower()),names[0])
+    cfg=connection_settings(app,d);names=models(cfg)
+    selected=selected_model(cfg,names)
     return dict(provider=cfg['provider'],models=names,selected_model=selected,model_available=selected in names,
         search_provider='Ollama Web Search / Web Fetch',note='A análise usa o servidor local. A busca web usa a chave Ollama, configurada separadamente; listar modelos não faz uma pesquisa paga nem altera suas preferências.')
 
 
 def generate(cfg, system, data, schema):
-    available = [] if cfg['model'] else models(cfg)
-    name = cfg['model'] or next((n for n in available if ':3b' in n.lower()), available[0])
+    name = selected_model(cfg, [] if cfg['model'] else models(cfg))
     messages = [{'role': 'system', 'content': system},
                 {'role': 'user', 'content': json.dumps(data, ensure_ascii=False, allow_nan=False)}]
     if cfg['provider'] == 'ollama':
         response = request(cfg['base_url'] + '/api/chat', {'model': name, 'messages': messages, 'stream': False,
                            'format': schema, 'options': {'temperature': 0.1, 'num_ctx': 8192, 'num_predict': 1800}}, timeout=240)
+        if not isinstance(response, dict):
+            raise ValueError('O servidor local devolveu uma resposta inválida.')
         if response.get('done_reason') == 'length':
             raise ValueError('A IA atingiu o limite de resposta; tente uma pergunta mais curta.')
-        content = response.get('message', {}).get('content', '')
+        message = response.get('message')
     else:
         response = request(cfg['base_url'] + '/v1/chat/completions', {'model': name, 'messages': messages,
                            'temperature': 0.1, 'max_tokens': 2400,
                            'response_format': {'type': 'json_schema', 'json_schema': {'name': 'analysis', 'strict': True, 'schema': schema}}}, timeout=240)
-        choices = response.get('choices', [])
-        if not choices or choices[0].get('finish_reason') == 'length':
+        choices = response.get('choices') if isinstance(response, dict) else None
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+            raise ValueError('O servidor local devolveu uma resposta inválida.')
+        if choices[0].get('finish_reason') == 'length':
             raise ValueError('A IA não concluiu a resposta. Tente uma pergunta menor.')
-        content = choices[0].get('message', {}).get('content', '')
+        message = choices[0].get('message')
+    content = message.get('content') if isinstance(message, dict) else None
     if not isinstance(content, str) or len(content) > 100_000:
         raise ValueError('Resposta da IA inválida.')
     try:
@@ -392,37 +420,87 @@ def mechanical_scenario(inputs, assets):
     return sectors
 
 
-def research(app, question, queries=None):
+def search_key(app):
     with app.connect() as c:
         key = app.read_cache(c, 'ai_search_key', '') or os.environ.get('OLLAMA_API_KEY', '')
     if not key:
         raise ValueError('Para pesquisar, configure a chave Ollama de busca na internet. A inferência local funciona sem ela.')
+    return key
+
+
+def search_results(query, key):
+    result = request(WEB_API + 'web_search', {'query': query[:1800], 'max_results': 4}, key)
+    if not isinstance(result, dict) or not isinstance(result.get('results'), list):
+        raise ValueError('A pesquisa devolveu um formato inválido.')
+    return result['results'][:4]
+
+
+def fetch_page(url, key):
+    result = request(WEB_API + 'web_fetch', {'url': url}, key)
+    content = result.get('content') if isinstance(result, dict) else None
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError('A página retornou sem texto.')
+    return content[:6000]
+
+
+def web_connection(app, d):
+    if d != {}:
+        raise ValueError('O teste de busca usa somente a chave já salva.')
+    query = 'Banco Central do Brasil política monetária Selic bcb.gov.br'
+    sources, warnings = research(app, query, queries=[query])
+    return {'sources': len(sources), 'pages_read': sum(s['kind'] == 'page_read' for s in sources),
+            'example_title': sources[0]['title'], 'warnings': warnings}
+
+
+def integration_check(app, mode, cfg):
+    if mode == 'web':
+        progress('Testando a busca e a leitura de páginas com uma consulta pública…')
+        r = web_connection(app, {})
+        summary = f'Busca respondeu: {r["sources"]} fonte(s), {r["pages_read"]} página(s) lida(s). Exemplo: {r["example_title"]}.'
+        progress(' '.join([summary, *r['warnings']]))
+        return
+    progress('Pedindo ao modelo local a extração de um dado de teste…')
+    schema = obj({'founded_year': {'type': 'integer'}, 'source_id': {'type': 'integer'}})
+    outcome, name = generate(cfg,
+        'Extraia o ano de fundação e o identificador da fonte como inteiros. Responda no formato JSON solicitado.',
+        {'sources': [{'id': 1, 'content': 'A Empresa Exemplo foi fundada em 1984.'}]}, schema)
+    if (outcome != {'founded_year': 1984, 'source_id': 1}
+            or any(type(value) is not int for value in outcome.values())):
+        raise ValueError(f'O modelo {name} respondeu, mas errou o formato ou a extração do dado de teste.')
+    progress(f'Modelo {name} respondeu e extraiu corretamente o ano e a referência da fonte de teste.')
+
+
+def research(app, question, queries=None):
     if queries is not None and (not isinstance(queries,list) or not 1<=len(queries)<=4 or any(not isinstance(q,str) or not q.strip() or len(q)>1500 for q in queries)):raise ValueError('Consultas de pesquisa fora do limite.')
+    key = search_key(app)
     sources, errors = [], []
     # Fixed bounded queries; the LLM cannot execute arbitrary tools or choose URLs to fetch.
     for query_index,query in enumerate(queries or (question + ' economia setores ETFs bancos centrais Brasil global fontes', question + ' episódios históricos crises Brasil global estudo')):
         read_in_query=0
-        r = request('https://ollama.com/api/web_search', {'query': query[:1800], 'max_results': 4}, key)
-        if not isinstance(r, dict) or not isinstance(r.get('results'), list):
-            raise ValueError('A pesquisa devolveu um formato inválido.')
-        for item in r['results'][:4]:
-            if not isinstance(item, dict):
+        try:
+            results = search_results(query, key)
+        except ValueError as exc:
+            message = f'Consulta web {query_index + 1} interrompida: {exc}'
+            if not sources:
+                raise ValueError(message) from None
+            errors.append(message)
+            break
+        for item in results:
+            if not isinstance(item, dict) or not isinstance(item.get('url'), str):
                 continue
             url = market_brief.safe_url(item.get('url', ''))
             if not url or any(s['url'] == url for s in sources):
                 continue
-            source = {'id': len(sources) + 1, 'title': str(item.get('title', 'Fonte'))[:300], 'url': url,
-                      'content': str(item.get('content', ''))[:2500], 'kind': 'search_excerpt', 'retrieved_at': app.now()}
+            source = {'id': len(sources) + 1, 'title': str(item.get('title') or 'Fonte')[:300], 'url': url,
+                      'content': str(item.get('content') or '')[:2500], 'kind': 'search_excerpt', 'retrieved_at': app.now()}
             should_read=len(sources)<3 if queries is None else read_in_query<(2 if query_index<6-len(queries) else 1)
             if should_read:
                 read_in_query+=1
                 try:
-                    fetched = request('https://ollama.com/api/web_fetch', {'url': url}, key)
-                    if isinstance(fetched.get('content'), str) and fetched['content'].strip():
-                        source['content'] = fetched['content'][:6000]
-                        source['kind'] = 'page_read'
-                except ValueError:
-                    errors.append('Artigo não lido: ' + source['title'])
+                    source['content'] = fetch_page(url, key)
+                    source['kind'] = 'page_read'
+                except ValueError as exc:
+                    errors.append(f'Página sem leitura ({source["title"]}): {exc}')
             sources.append(source)
     if not sources:
         raise ValueError('Nenhuma fonte encontrada; a análise anterior foi preservada.')
@@ -869,6 +947,15 @@ def start(app, kind, d):
         elif kind == 'issuer_completion':
             from aporte_brasil.company import company_completion
             inputs=company_completion.validate_request(app,d)
+        elif kind == 'integration_check':
+            mode = d.get('mode')
+            settings = {k: v for k, v in d.items() if k != 'mode'}
+            if mode == 'model':
+                inputs = (mode, connection_settings(app, settings))
+            elif mode == 'web' and not settings:
+                inputs = (mode, None)
+            else:
+                raise ValueError('Escolha o teste do modelo local ou da busca na internet.')
         elif kind=='business_drivers':
             from aporte_brasil.company import business_drivers
             inputs=business_drivers.validate_request(app,d)
@@ -906,6 +993,8 @@ def start(app, kind, d):
             elif kind == 'issuer_completion':
                 from aporte_brasil.company import company_completion
                 company_completion.run(app,inputs)
+            elif kind == 'integration_check':
+                integration_check(app, *inputs)
             elif kind=='business_drivers':
                 from aporte_brasil.company import business_drivers
                 business_drivers.generate(app,inputs)
@@ -950,6 +1039,8 @@ def action(app, path, d):
                 app.write_cache(c, 'ai_search_key', key)
         return {'ok': True}
     if path == '/api/ai/connection':return connection(app,d)
+    if path == '/api/ai/web-connection':return web_connection(app,d)
+    if path == '/api/ai/integration-check':return start(app,'integration_check',d)
     if path == '/api/ai/models':
         if d:
             raise ValueError('O teste usa a configuração salva, sem parâmetros.')

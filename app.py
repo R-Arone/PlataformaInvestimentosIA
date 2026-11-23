@@ -1895,6 +1895,7 @@ class Handler(BaseHTTPRequestHandler):
                  '/intelligence.js': ('intelligence.js', 'application/javascript'),
                  '/tesouro.js': ('tesouro.js', 'application/javascript'),
                  '/long-term.js': ('long-term.js', 'application/javascript'),
+                 '/retirement.js': ('retirement.js', 'application/javascript'),
                  '/navigation.js': ('navigation.js', 'application/javascript'),
                  '/research-dashboard.js': ('research-dashboard.js', 'application/javascript'),
                  '/accessibility.js': ('accessibility.js', 'application/javascript'),

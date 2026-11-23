@@ -83,6 +83,15 @@ O APK de teste fica em `android/app/build/outputs/apk/debug/app-debug.apk`. O Gr
 
 O Android preserva os dados em atualizações feitas sobre o mesmo identificador de aplicativo, com assinatura compatível. As variantes `debug` e `release` instalam lado a lado e têm carteiras independentes. Referências oficiais: [gerar e assinar builds](https://developer.android.com/studio/publish/app-signing), [regras de atualização](https://developer.android.com/google/play/app-updates) e [instalação com adb](https://developer.android.com/tools/adb).
 
+### Testar a carteira do PC no Android usando o Google Drive
+
+1. No PC, abra **Configurações → Preferências e backup → Baixar backup criptografado**. Guarde o arquivo `.aporteb` em uma pasta privada do seu Google Drive.
+2. No Android, instale a versão **0.1.1** ou mais recente. Abra o app e desbloqueie a carteira local. Na primeira execução, crie a senha local do celular.
+3. Vá a **Mais → Configurações → Preferências e backup → Restaurar backup protegido**. Toque no campo de arquivo e escolha o `.aporteb` no Drive pelo seletor do Android. Se o Drive não aparecer no seletor, baixe o arquivo pelo app do Drive e escolha-o em **Downloads**.
+4. Digite a senha da carteira do PC usada na criação do backup, confirme a substituição da carteira do celular e toque em **Restaurar carteira**. Confira as posições e operações antes de testar um novo aporte.
+
+A restauração carrega a carteira da data da exportação e preserva uma cópia criptografada da carteira anterior do celular. O app continua usando a senha local do celular. Alterações feitas no PC entram no celular quando você restaura um novo backup e a restauração substitui as alterações locais posteriores. Durante esse teste, mantenha o PC como sua carteira principal.
+
 ### Compartilhar com amigos
 
 | Caminho | Quem recebe | Custo e atualização |
